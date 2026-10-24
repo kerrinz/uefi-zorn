@@ -1,0 +1,38 @@
+[Defines]
+  INF_VERSION                    = 0x0001001B
+  BASE_NAME                      = ZornBootMemoryDxe
+  FILE_GUID                      = 8E2A6C41-5F17-4B90-A3D8-1C74E0B59A26
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = ZornBootMemoryDxeEntry
+
+[Sources]
+  ZornBootMemoryDxe.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  SiliciumPkg/SiliciumPkg.dec
+  zornPkg/zorn.dec
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  DxeServicesTableLib
+  FdtLib
+  HobLib
+  MemoryAllocationLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+
+[Guids]
+  gZornEntryArgHobGuid                          ## CONSUMES
+
+[Protocols]
+  gEfiBlockIoProtocolGuid                        ## PRODUCES
+  gEfiDevicePathProtocolGuid                     ## PRODUCES
+  gEfiSimpleFileSystemProtocolGuid               ## CONSUMES
+
+[Depex]
+  TRUE

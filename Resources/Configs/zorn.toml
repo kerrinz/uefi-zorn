@@ -1,0 +1,32 @@
+#
+# Redmi K80 / POCO F7 Pro (zorn, SM8650-AB, pineapple)
+# Addresses follow the giulia SM8650 Mu-Silicium port, except the splash
+# window, which follows Xiaomi pineapple-sde-display.dtsi.
+#
+
+[status]
+model_count = 1
+
+[boot_shim]
+requires_kernel_header = true
+
+[uefi_fd]
+base = 0xA7100000
+size = 0x300000
+
+[boot_image_kernel]
+kernel_compression = "gzip"
+# Xiaomi ABL takes the DTB from the on-device vendor_boot image.
+# scripts/package-zorn-boot.py does not append one. Do not flash vendor_boot.
+append_dtb = false
+
+#
+# Header v4 matches the stock boot image (fastboot getvar and the local
+# TWRP image). The kernel load address is not in this header; ABL takes it
+# from the on-device vendor_boot. Do not flash vendor_boot.
+#
+[boot_image]
+header_version = 4
+os_version = "15.0.0"
+os_patch_level = "2024-09"
+pagesize = 4096

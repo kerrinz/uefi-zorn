@@ -1,0 +1,29 @@
+/dts-v1/;
+
+/*
+ * Minimal tree for an early fastboot-boot experiment.
+ * The stock zorn DTB is still missing from the open kernel drop. This tree
+ * only carries the continuous-splash reservation Xiaomi SM8650 boards inherit
+ * from pineapple-sde-display.dtsi, so ABL can keep the panel powered.
+ * It is not a substitute for the stock memory map.
+ */
+
+/ {
+	model = "Xiaomi Redmi K80 (zorn)";
+	compatible = "qcom,pineapple-mtp", "qcom,pineapple", "qcom,mtp";
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		splash_region: splash_region {
+			reg = <0x0 0xfc400000 0x0 0x02b00000>;
+			label = "cont_splash_region";
+		};
+	};
+
+	chosen { };
+};

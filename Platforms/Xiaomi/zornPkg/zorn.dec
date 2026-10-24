@@ -1,0 +1,15 @@
+##
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+##
+
+[Defines]
+  DEC_SPECIFICATION              = 0x00010005
+  PACKAGE_NAME                   = zornPkg
+  PACKAGE_GUID                   = 4B8E1A77-C3D2-4F60-9E15-2A6D80C4B193
+  PACKAGE_VERSION                = 0.1
+
+[Includes]
+
+[Guids]
+  # HOB holding x0 from the previous stage. ABL passes the FDT address.
+  gZornEntryArgHobGuid = { 0xDAEE82E6, 0x8090, 0x4E72, { 0xBF, 0xB9, 0x78, 0xC1, 0x3C, 0xD4, 0xE3, 0x59 } }

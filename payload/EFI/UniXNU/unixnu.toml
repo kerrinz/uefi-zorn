@@ -1,0 +1,38 @@
+# First XNU entry. The menu counts down even when a serial console exists,
+# then DarwinBoot loads Payloads/kernel.macho. There is no iOS root volume.
+version = 1
+
+[boot]
+timeout = 10
+fallback_timeout = 10
+default = "xnu"
+
+[ui]
+title = "Redmi K80"
+layout = "portrait"
+
+[[entry]]
+id = "xnu"
+title = "Boot XNU"
+type = "xnu"
+path = "Payloads/kernel.macho"
+initrd = "Payloads/root.img"
+args = "rd=md0 -v serial=3 debug=0x14e"
+
+[[entry]]
+id = "mounted"
+title = "Return to firmware"
+type = "action"
+action = "exit"
+
+[[entry]]
+id = "reset"
+title = "Restart"
+type = "action"
+action = "reset"
+
+[[entry]]
+id = "shutdown"
+title = "Power off"
+type = "action"
+action = "shutdown"
