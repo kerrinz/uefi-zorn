@@ -65,17 +65,17 @@ python3 ../uefi-zorn/scripts/package-zorn-boot.py \
 
 `make-zorn-payload.py` 把簇固定成 512 字节，并清掉 mtools 留在引导扇区里的假分区表。EDK2 的 Fat 驱动只接受簇数不少于 65525 的 FAT32。通用 `unixnu build payload` 不处理这两件事，所以实测镜像走上面两条命令。
 
-`root.img` 是从 iPadOS 17.7.11 IPSW 抽出的恢复内存盘，再压成 `DBRDISK1`。它不在本仓库里。
+`root.img` 是从 iPadOS 17.7.11 IPSW 抽出的恢复内存盘，再压成 `DBRDISK1`。它不在本仓库里。菜单里的 `initrd` 仍指向它。内核在登记这张恢复盘之前，先把 `userdata` 上的 OS 容器登记成 `md0`。
 
-启动前用 `fastboot getvar product` 和 `fastboot getvar current-slot` 确认这是 zorn、而且当前槽位仍是原来的 Android 槽。然后只执行 `fastboot boot boot.img`。不要 `flash`，不要 `erase`，不要写 `vendor_boot`。
+启动前用 `fastboot getvar product` 和 `fastboot getvar current-slot` 确认这是 zorn、而且当前槽位仍是原来的 Android 槽。然后只执行 `fastboot boot boot.img`。不要写 `boot`、`super`、`vbmeta`、`vendor_boot`，不要 `erase`，不要改槽位。`userdata` 上的系统卷由 UniXNU-zorn 说明，不要再刷。
 
 ## 进度
 
-固件已经在真机上进过菜单。菜单标题是 Redmi K80，配置路径是 `\EFI\UniXNU\unixnu.toml`，倒计时 10 秒，然后把 `Boot XNU` 交给 DarwinBoot。
+固件已经在真机上进过菜单。菜单标题是 Redmi K80，配置路径是 `\EFI\UniXNU\unixnu.toml`，倒计时 5 秒，然后把 `Boot XNU` 交给 DarwinBoot。
 
 `ZornBootMemoryDxe` 只扫描 `EFI_MEMORY_WB`。邮箱在 DXE 阶段经常已经不在，驱动就在内核窗口里按 512 字节找 FAT 引导扇区，把整卷复制到 `EfiBootServicesData`，再挂载并打开配置。
 
-内核从菜单之后走到哪里，写在 UniXNU-zorn 的 README。2026-10-25 停在 `PARSE`。
+内核从菜单之后走到哪里，写在 UniXNU-zorn 的 README。2026-10-26 停在 `MEND`。
 
 ## 许可
 

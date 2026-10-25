@@ -1,10 +1,12 @@
-# First XNU entry. The menu counts down even when a serial console exists,
-# then DarwinBoot loads Payloads/kernel.macho. There is no iOS root volume.
+# RAM-boot menu. DarwinBoot loads Payloads/kernel.macho and the restore
+# ramdisk at Payloads/root.img. The kernel registers the userdata OS
+# container as md0 before that ramdisk, so rd=md0 is the read-only APFS root.
+# The countdown is 5 seconds.
 version = 1
 
 [boot]
-timeout = 10
-fallback_timeout = 10
+timeout = 5
+fallback_timeout = 5
 default = "xnu"
 
 [ui]
