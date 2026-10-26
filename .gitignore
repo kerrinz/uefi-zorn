@@ -12,3 +12,14 @@ BootShim.elf
 
 Mu-*.*
 *:Zone.Identifier
+
+# Generated payloads and proprietary firmware inputs stay outside this repo.
+/out/
+*.img
+*.ipsw
+*.dmg
+*.im4p
+*.macho
+*.fd
+*.o
+*.a

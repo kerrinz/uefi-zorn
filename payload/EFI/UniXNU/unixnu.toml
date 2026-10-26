@@ -19,7 +19,7 @@ title = "Boot XNU"
 type = "xnu"
 path = "Payloads/kernel.macho"
 initrd = "Payloads/root.img"
-args = "rd=md0 -v serial=3 debug=0x14e"
+args = "rd=md0 -v serial=3 debug=0x14e zorn_pmgr=2 zorn_checkpoint=USVC zorn_checkpoint_skip=63 zorn_checkpoint_early=1 zorn_log_only=1 zorn_trace_compact=1 zorn_wdt=1"
 
 [[entry]]
 id = "mounted"

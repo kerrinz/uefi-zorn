@@ -6,7 +6,9 @@ about 131 MiB, so the volume is 192 MiB FAT32 with 512-byte clusters.
 The decompressed image stays well inside the 256 MiB kernel window.
 """
 import argparse
+import hashlib
 import os
+import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +17,61 @@ ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parent
 SECTORS = 192 * 2048  # 192 MiB; sparse ramdisk plus kernel, with room in the 256 MiB window
 LABEL = b"ZORNESP    "
+ORIGINAL_TRUST_SHA256 = "7416ca4f8377146626bb284e2133c76bee6cb4e3ee0af5d648b186235a7323a7"
+
+
+def trustcache_adt(data):
+    """Add only the zeroed chosen/memory-map/TrustCache loader placeholder."""
+    def parse(at, depth=0):
+        if depth > 32 or at + 8 > len(data):
+            raise ValueError("invalid ADT node")
+        np, nc = struct.unpack_from("<II", data, at)
+        if np > 256 or nc > 256:
+            raise ValueError("invalid ADT counts")
+        at += 8
+        properties = []
+        for _ in range(np):
+            start = at
+            if at + 36 > len(data):
+                raise ValueError("truncated ADT property")
+            name = data[at:at + 32].split(b"\0", 1)[0]
+            size = struct.unpack_from("<I", data, at + 32)[0] & 0x7fffffff
+            at += 36
+            value = data[at:at + size]
+            at += (size + 3) & ~3
+            if at > len(data):
+                raise ValueError("ADT property exceeds input")
+            properties.append((name, value, data[start:at]))
+        children = []
+        for _ in range(nc):
+            child, at = parse(at, depth + 1)
+            children.append(child)
+        return [properties, children], at
+
+    def emit(node):
+        props, children = node
+        return (struct.pack("<II", len(props), len(children)) +
+                b"".join(p[2] for p in props) + b"".join(emit(c) for c in children))
+
+    def child(node, name):
+        matches = [c for c in node[1]
+                   if any(p[0] == b"name" and p[1].rstrip(b"\0") == name for p in c[0])]
+        if len(matches) != 1:
+            raise ValueError(f"ADT requires exactly one {name!r} child")
+        return matches[0]
+
+    root, end = parse(0)
+    if end != len(data) or emit(root) != data:
+        raise ValueError("ADT did not round-trip exactly")
+    memory = child(child(root, b"chosen"), b"memory-map")
+    found = [p for p in memory[0] if p[0] == b"TrustCache"]
+    if found:
+        if len(found) != 1 or found[0][1] != bytes(16):
+            raise ValueError("TrustCache must be one zeroed 16-byte loader placeholder")
+    else:
+        raw = b"TrustCache".ljust(32, b"\0") + struct.pack("<I", 16) + bytes(16)
+        memory[0].append((b"TrustCache", bytes(16), raw))
+    return emit(root)
 
 
 def run(cmd):
@@ -59,6 +116,7 @@ def main():
     parser.add_argument("--kernel", type=Path, default=REPO / "UniXNU/out/zorn/kernel/kernel.macho")
     parser.add_argument("--adt", type=Path, default=REPO / "out/zorn/kernel.macho.adt")
     parser.add_argument("--root", type=Path, default=REPO / "out/zorn/root.img")
+    parser.add_argument("--trust-cache", type=Path, help="unchanged original 21H461 static+System bundle")
     parser.add_argument("-o", "--output", type=Path, default=REPO / "out/zorn/payload.img")
     args = parser.parse_args()
     toml, kernel, adt, root_img, out = args.toml, args.kernel, args.adt, args.root, args.output
@@ -66,6 +124,14 @@ def main():
         if not path.is_file():
             sys.exit(f"missing {path}")
     out.parent.mkdir(parents=True, exist_ok=True)
+    if args.trust_cache:
+        trust = args.trust_cache.read_bytes()
+        if hashlib.sha256(trust).hexdigest() != ORIGINAL_TRUST_SHA256:
+            sys.exit("trust cache is not the pinned original 21H461 static+System bundle")
+        handoff = trustcache_adt(adt.read_bytes())
+        adt = out.parent / "payload-with-trustcache.adt"
+        adt.write_bytes(handoff)
+        print(f"original trust cache {len(trust)} bytes; ADT placeholder {len(handoff)} bytes")
     if out.exists():
         out.unlink()
     run([
@@ -78,6 +144,9 @@ def main():
     run(["mcopy", "-i", str(out), "-Q", str(kernel), "::/EFI/UniXNU/Payloads/kernel.macho"])
     run(["mcopy", "-i", str(out), "-Q", str(adt), "::/EFI/UniXNU/Payloads/kernel.macho.adt"])
     run(["mcopy", "-i", str(out), "-Q", str(root_img), "::/EFI/UniXNU/Payloads/root.img"])
+    if args.trust_cache:
+        run(["mcopy", "-i", str(out), "-Q", str(args.trust_cache),
+             "::/EFI/UniXNU/Payloads/kernel.macho.trustcache"])
     data = bytearray(out.read_bytes())
     if len(data) != SECTORS * 512:
         sys.exit(f"image is {len(data)} bytes, expected {SECTORS * 512}")
@@ -91,6 +160,8 @@ def main():
     )
     if "kernel.macho" not in listing or "root" not in listing.lower() or "unixnu" not in listing.lower():
         sys.exit(f"payload listing is missing the kernel:\n{listing}")
+    if args.trust_cache and "kernel.macho.trustcache" not in listing:
+        sys.exit("payload is missing trust cache sidecar")
     print(listing)
     print(f"wrote {out} ({len(data)} bytes)")
 
