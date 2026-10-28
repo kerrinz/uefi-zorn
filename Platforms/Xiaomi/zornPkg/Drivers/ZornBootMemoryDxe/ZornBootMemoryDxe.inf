@@ -8,14 +8,19 @@
 
 [Sources]
   ZornBootMemoryDxe.c
+  ZornTouchPower.h
 
 [Packages]
   MdePkg/MdePkg.dec
   MdeModulePkg/MdeModulePkg.dec
+  UefiCpuPkg/UefiCpuPkg.dec
   SiliciumPkg/SiliciumPkg.dec
+  QcomPkg/QcomPkg.dec
   zornPkg/zorn.dec
 
 [LibraryClasses]
+  ArmSmcLib
+  ArmMmuLib
   BaseLib
   BaseMemoryLib
   DebugLib
@@ -30,6 +35,7 @@
   gZornEntryArgHobGuid                          ## CONSUMES
 
 [Protocols]
+  gEfiClockProtocolGuid                          ## CONSUMES
   gEfiBlockIoProtocolGuid                        ## PRODUCES
   gEfiDevicePathProtocolGuid                     ## PRODUCES
   gEfiSimpleFileSystemProtocolGuid               ## CONSUMES

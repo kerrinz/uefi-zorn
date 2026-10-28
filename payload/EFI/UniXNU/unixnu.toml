@@ -1,6 +1,5 @@
-# RAM-boot menu. DarwinBoot loads Payloads/kernel.macho and the restore
-# ramdisk at Payloads/root.img. The kernel registers the userdata OS
-# container as md0 before that ramdisk, so rd=md0 is the read-only APFS root.
+# RAM-boot menu. DarwinBoot loads the kernel/ADT/trust cache, without an
+# initrd. OS uses readonly md0; original IOKit/APFS publish SystemOS volumes.
 # The countdown is 5 seconds.
 version = 1
 
@@ -18,8 +17,7 @@ id = "xnu"
 title = "Boot XNU"
 type = "xnu"
 path = "Payloads/kernel.macho"
-initrd = "Payloads/root.img"
-args = "rd=md0 -v serial=3 debug=0x14e zorn_pmgr=2 zorn_checkpoint=USVC zorn_checkpoint_skip=63 zorn_checkpoint_early=1 zorn_log_only=1 zorn_trace_compact=1 zorn_wdt=1"
+args = "rd=md0 -v serial=3 debug=0x14e zorn_pmgr=2 zorn_checkpoint=NOHIT zorn_checkpoint_early=1 zorn_log_only=1 zorn_trace_compact=1 zorn_wdt=1 zorn_hash_budget=120 zorn_service_trace=1"
 
 [[entry]]
 id = "mounted"

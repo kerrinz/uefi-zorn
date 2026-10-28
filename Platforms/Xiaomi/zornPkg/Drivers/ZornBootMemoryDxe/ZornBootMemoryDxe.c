@@ -18,6 +18,8 @@
 
 #include <Uefi.h>
 #include <Library/BaseLib.h>
+#include <Library/ArmSmcLib.h>
+#include <Library/ArmMmuLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/DebugLib.h>
 #include <Library/DxeServicesTableLib.h>
@@ -28,11 +30,80 @@
 #include <Protocol/BlockIo.h>
 #include <Protocol/DevicePath.h>
 #include <Protocol/SimpleFileSystem.h>
+#include "ZornTouchPower.h"
 
-#define MAX_RANGES        64
+#define MAX_RANGES        256
 #define MIN_PIECE_SIZE    SIZE_16MB
-#define ADD_LIMIT         SIZE_1GB
-#define ADD_BELOW         SIZE_4GB     // stay inside what the MMU setup maps
+// K80's live DT describes most DRAM above 0x880000000. ArmMmuLib uses the
+// CPU's physical-address width for its identity VA space and can add mappings
+// there. Only actual DT banks minus DT/GCD reservations are advertised.
+#define ADD_LIMIT         0x400000000ULL // 16 GiB ceiling, never invented RAM
+
+// Explicit diagnostic marker in FAT boot-code bytes, outside the BPB. The host
+// must verify the recovery BCB before booting such a payload. Normal payloads
+// have no marker and do not touch this watchdog.
+#define ZORN_WDT_MARKER_OFFSET  0x180
+
+STATIC
+ARM_SMC_ARGS
+ZornWdtCall (IN UINTN Function, IN UINTN Arg1, IN UINTN Arg2)
+{
+  ARM_SMC_ARGS  Args;
+  ZeroMem (&Args, sizeof (Args));
+  Args.Arg0 = Function;
+  Args.Arg1 = Arg1;
+  Args.Arg2 = Arg2;
+  ArmCallSmc (&Args);
+  return Args;
+}
+
+STATIC
+EFI_STATUS
+ArmEarlyWatchdog (IN CONST UINT8 *Sector)
+{
+  ARM_SMC_ARGS  Result;
+  UINT32        Mode;
+  UINT32        Bark;
+  UINT32        Bite;
+
+  if (CompareMem (Sector + ZORN_WDT_MARKER_OFFSET, "ZORNGHWD", 8) != 0) {
+    return EFI_SUCCESS;
+  }
+  Mode = ReadUnaligned32 ((CONST UINT32 *)(Sector + ZORN_WDT_MARKER_OFFSET + 8));
+  if (((Mode != 1) && (Mode != 2)) ||
+      (ReadUnaligned32 ((CONST UINT32 *)(Sector + ZORN_WDT_MARKER_OFFSET + 12)) != ~Mode)) {
+    return EFI_COMPROMISED_DATA;
+  }
+  Result = ZornWdtCall (0x86000006, 0, 0);
+  if (Result.Arg0 != 0) { goto Failed; }
+  if ((Result.Arg1 & 1) != 0) {
+    Result = ZornWdtCall (0x86000005, 2, 0);
+    if (Result.Arg0 != 0) { goto Failed; }
+  }
+  Bark = (Mode == 2) ? 5000 : 60000;
+  Bite = (Mode == 2) ? 7000 : 65000;
+  Result = ZornWdtCall (0x86000008, Bark, Bite);
+  if (Result.Arg0 != 0) { goto Failed; }
+  Result = ZornWdtCall (0x86000007, 0, 0);
+  if (Result.Arg0 != 0) { goto Failed; }
+  Result = ZornWdtCall (0x86000005, 3, 0);
+  if (Result.Arg0 != 0) { goto Failed; }
+  Result = ZornWdtCall (0x86000006, 0, 0);
+  if ((Result.Arg0 != 0) || ((Result.Arg1 & 1) == 0)) { goto Failed; }
+  DEBUG ((DEBUG_ERROR, "ZORNWDT: armed mode %u bark %u bite %u ms\n", Mode, Bark, Bite));
+  if (Mode == 2) {
+    DEBUG ((DEBUG_ERROR, "ZORNWDT: deliberately stopping before filesystem/kernel startup\n"));
+    DisableInterrupts ();
+    CpuDeadLoop ();
+  }
+  return EFI_SUCCESS;
+
+Failed:
+  DEBUG ((DEBUG_ERROR, "ZORNWDT: SMC rejected 0x%lx; resetting with prearmed recovery BCB\n", Result.Arg0));
+  ZornWdtCall (0x84000009, 0, 0);
+  CpuDeadLoop ();
+  return EFI_DEVICE_ERROR;
+}
 
 typedef struct {
   UINT64  Base;
@@ -97,10 +168,17 @@ CollectReg (
   }
 
   Entry = (AddressCells + SizeCells) * sizeof (UINT32);
-  for (Offset = 0; (Offset + (INT32)Entry <= Length) && (Count < MAX_RANGES); Offset += Entry) {
+  if ((AddressCells < 1) || (AddressCells > 2) || (SizeCells < 1) || (SizeCells > 2) ||
+      (Length < 0) || ((UINT32)Length % Entry != 0)) {
+    return MAX_UINTN;
+  }
+  for (Offset = 0; Offset + (INT32)Entry <= Length; Offset += Entry) {
     Base = ReadCells (Reg + Offset, AddressCells);
     Size = ReadCells (Reg + Offset + AddressCells * sizeof (UINT32), SizeCells);
-    if ((Size != 0) && (Base + Size > Base)) {
+    if (Size != 0) {
+      if ((Count >= MAX_RANGES) || (Base + Size <= Base)) {
+        return MAX_UINTN;
+      }
       Ranges[Count].Base = Base;
       Ranges[Count].End  = Base + Size;
       Count++;
@@ -191,6 +269,10 @@ AddMemory (
     Type = FdtGetProp (Fdt, Node, "device_type", &Length);
     if ((Type != NULL) && (AsciiStrCmp (Type, "memory") == 0)) {
       BankCount = CollectReg (Fdt, Node, AddressCells, SizeCells, Banks, BankCount);
+      if (BankCount == MAX_UINTN) {
+        DEBUG ((DEBUG_ERROR, "ZORNMEM: invalid or overflowing DRAM ranges; no memory added\n"));
+        return;
+      }
     }
   }
 
@@ -202,6 +284,32 @@ AddMemory (
 
     for (Node = FdtFirstSubnode (Fdt, Reserved); Node >= 0; Node = FdtNextSubnode (Fdt, Node)) {
       ReservedCount = CollectReg (Fdt, Node, ResAddress, ResSize, ReservedRanges, ReservedCount);
+      if (ReservedCount == MAX_UINTN) {
+        DEBUG ((DEBUG_ERROR, "ZORNMEM: invalid or overflowing reservations; no memory added\n"));
+        return;
+      }
+    }
+  }
+
+  // The FDT reserve map is independent of /reserved-memory and must also
+  // remain excluded when exposing high DRAM to the allocator.
+  INTN ReserveEntries = FdtGetNumberOfReserveMapEntries (Fdt);
+  if ((ReserveEntries < 0) || ((UINTN)ReserveEntries > MAX_RANGES - ReservedCount)) {
+    DEBUG ((DEBUG_ERROR, "ZORNMEM: invalid FDT reserve map; no memory added\n"));
+    return;
+  }
+  for (INTN EntryIndex = 0; EntryIndex < ReserveEntries; EntryIndex++) {
+    UINT64 ReserveBase;
+    UINT64 ReserveSize;
+    if ((FdtGetReserveMapEntry (Fdt, EntryIndex, &ReserveBase, &ReserveSize) != 0) ||
+        (ReserveSize > MAX_UINT64 - ReserveBase)) {
+      DEBUG ((DEBUG_ERROR, "ZORNMEM: invalid FDT reservation; no memory added\n"));
+      return;
+    }
+    if (ReserveSize != 0) {
+      ReservedRanges[ReservedCount].Base = ReserveBase;
+      ReservedRanges[ReservedCount].End = ReserveBase + ReserveSize;
+      ReservedCount++;
     }
   }
 
@@ -251,7 +359,7 @@ AddMemory (
     for (Other = 0; (Other < PieceCount) && (Added < ADD_LIMIT); Other++) {
       Base = ALIGN_VALUE (Pieces[Other].Base, SIZE_2MB);
       End  = Pieces[Other].End & ~((UINT64)SIZE_2MB - 1);
-      if ((End <= Base) || (End - Base < MIN_PIECE_SIZE) || (End > ADD_BELOW)) {
+      if ((End <= Base) || (End - Base < MIN_PIECE_SIZE)) {
         continue;
       }
 
@@ -260,6 +368,14 @@ AddMemory (
       //
       // Add and map before anything can allocate from it.
       //
+      // Mapping must precede AddMemorySpace: DXE advertises conventional
+      // pages immediately, and the page-table allocator could otherwise
+      // receive a new high page before that page itself is mapped.
+      Status = ArmSetMemoryAttributes (Base, End - Base, EFI_MEMORY_WB, 0);
+      if (EFI_ERROR (Status)) {
+        DEBUG ((DEBUG_ERROR, "ZORNMEM: cannot map 0x%lx-0x%lx %r\n", Base, End - 1, Status));
+        continue;
+      }
       Status = gDS->AddMemorySpace (
                       EfiGcdMemoryTypeSystemMemory,
                       Base,
@@ -453,6 +569,17 @@ PublishRange (
 
   if ((End <= Start) || (((End - Start) % RAM_BLOCK_SIZE) != 0)) {
     return EFI_INVALID_PARAMETER;
+  }
+  Status = ArmEarlyWatchdog ((CONST UINT8 *)(UINTN)Start);
+  if (EFI_ERROR (Status)) {
+    return Status;
+  }
+  Status = PrepareZornTouchPower ((CONST UINT8 *)(UINTN)Start);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "ZORNTOUCH: handoff refused %r; recovery\n", Status));
+    ZornWdtCall (0x84000009, 0, 0);
+    CpuDeadLoop ();
+    return Status;
   }
 
   //
@@ -703,9 +830,8 @@ ZornBootMemoryDxeEntry (
   EFI_HOB_GUID_TYPE  *Hob;
   UINT64             Dtb;
 
-  if (!EFI_ERROR (PublishMailbox ())) {
-    return EFI_SUCCESS;
-  }
+  // A published payload must not skip discovery of the actual DRAM banks.
+  PublishMailbox ();
 
   Hob = GetFirstGuidHob (&gZornEntryArgHobGuid);
   if (Hob == NULL) {
@@ -717,7 +843,9 @@ ZornBootMemoryDxeEntry (
     } else {
       DEBUG ((DEBUG_ERROR, "ZORNMEM: device tree at 0x%lx, %u bytes\n", Dtb, (UINT32)FdtTotalSize ((VOID *)(UINTN)Dtb)));
       AddMemory ((VOID *)(UINTN)Dtb);
-      PublishInitrd ((VOID *)(UINTN)Dtb);
+      if (mRamBase == NULL) {
+        PublishInitrd ((VOID *)(UINTN)Dtb);
+      }
     }
   }
 
