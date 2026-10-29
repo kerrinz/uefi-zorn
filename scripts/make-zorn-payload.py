@@ -30,7 +30,7 @@ def development_wifi_identity():
 
 
 def trustcache_adt(data, omit_ramdisk=False, with_trust_cache=True, packed_data=False,
-                   owned_memory=None, cpu_fixups=None, wifi_identity=None):
+                   owned_memory=None, cpu_fixups=None, wifi_identity=None, smp_preflight=0,smp_continue=False):
     """Match loader placeholders to supplied files without changing the input."""
     def parse(at, depth=0):
         if depth > 32 or at + 8 > len(data):
@@ -74,6 +74,25 @@ def trustcache_adt(data, omit_ramdisk=False, with_trust_cache=True, packed_data=
     if end != len(data) or emit(root) != data:
         raise ValueError("ADT did not round-trip exactly")
     chosen = child(root, b"chosen")
+    if smp_preflight:
+        if smp_preflight != 8 or (not smp_continue and (packed_data or not omit_ramdisk)):
+            raise ValueError("eight-core preflight excludes Data/initrd")
+        cpus = child(root, b"cpus")
+        if len(cpus[1]) != 1:
+            raise ValueError("SMP input must be the single-core base ADT")
+        def prop(name,value):
+            raw=name.ljust(32,b"\0")+struct.pack("<I",len(value))+value+bytes((-len(value))&3)
+            return (name,value,raw)
+        base=cpus[1][0]
+        properties=dict((p[0],p[1]) for p in base[0])
+        if properties.get(b"reg") != bytes(4) or base[1]:
+            raise ValueError("unexpected boot CPU ADT")
+        for id in range(1,8):
+            replacements={b"name":f"cpu{id}".encode()+b"\0",b"reg":struct.pack("<I",id*0x100),b"state":b"waiting\0"}
+            cpus[1].append([[prop(p[0],replacements[p[0]]) if p[0] in replacements else p for p in base[0]],[]])
+        if any(any(p[0]==b"name" and p[1]==b"psci\0" for p in c[0]) for c in root[1]):
+            raise ValueError("duplicate PSCI")
+        root[1].append([[prop(b"name",b"psci\0"),prop(b"compatible",b"arm,psci-1.0\0"),prop(b"method",b"smc\0")],[]])
     memory = child(chosen, b"memory-map")
     def install(name, value, replace=False):
         matches = [p for p in chosen[0] if p[0] == name]
@@ -165,6 +184,11 @@ def edk2_fat32(image: bytes):
 
 def main():
     parser = argparse.ArgumentParser(description="Pack the ZORNESP FAT volume. Does not flash.")
+    parser.add_argument('--data-profile',choices=('512m','8g'),default='512m')
+    parser.add_argument('--fresh-data',action='store_true',help='explicit initial boot of a new8GiBData store')
+    parser.add_argument("--smp-preflight",type=int,choices=(0,8),default=0,
+                        help="eight-core pre-root qualification, no Data publication")
+    parser.add_argument("--smp-continue",action="store_true",help="continue passed eight-core checks into retained dim GUI")
     parser.add_argument("--toml", type=Path, default=ROOT / "payload/EFI/UniXNU/unixnu.toml")
     parser.add_argument("--kernel", type=Path, default=REPO / "UniXNU/out/zorn/kernel/kernel.macho")
     parser.add_argument("--adt", type=Path, default=REPO / "out/zorn/kernel.macho.adt")
@@ -194,6 +218,13 @@ def main():
     parser.add_argument("--touch-handoff", action="store_true", help="explicit K80 touch power and clock votes in UEFI")
     parser.add_argument("--touch-identify", action="store_true", help="bounded FT3683 GPIO SPI ID read after native handoff")
     parser.add_argument("--touch-frames", action="store_true", help="bounded 20-second raw FT3683 frame reads after ID; no HID")
+    parser.add_argument("--touch-full", action="store_true", help="complete 3120-byte raw touch frame and visible cue; requires --touch-frames")
+    parser.add_argument("--touch-calibrate", action="store_true", help="same-boot untouched baseline plus active matrix; requires --touch-full")
+    parser.add_argument("--touch-runtime", action="store_true", help="experimental long-lived calibrated FT3683 digitizer for the CPU GUI")
+    parser.add_argument("--touch-fast-poll", action="store_true", help="32-byte cooperative wire yield/20ms poll; eight-core trace runtime only")
+    parser.add_argument("--touch-trace", action="store_true", help="coordinate evidence in unused GUI stack slots; excludes stack samplers")
+    parser.add_argument("--touch-edges", action="store_true", help="opt-in device-owned HID edge dispatch adapter; runtime touch required")
+    parser.add_argument("--touch-kernel-parser", action="store_true", help="device-only original kernel HID parser personality")
     parser.add_argument("--hid-family", action="store_true", help="load original HID OS services without publishing a touch/input device")
     parser.add_argument("--minimal-services", action="store_true", help="apply an upstream-derived temporary service policy on RAM Data")
     parser.add_argument("--lite-services", action="store_true", help="use the upstream sheng-lite list instead of the four-job minimal list")
@@ -206,14 +237,38 @@ def main():
     parser.add_argument("--trust-cache", type=Path, help="unchanged original 21H461 static+System bundle")
     parser.add_argument("-o", "--output", type=Path, default=REPO / "out/zorn/payload.img")
     args = parser.parse_args()
-    if args.touch_handoff and (not args.touch_probe or args.early_watchdog != 1):
+    if args.fresh_data and (args.data_profile!='8g' or args.data_store_mode!=2 or args.retained_data or args.touch_runtime):
+        parser.error('fresh Data requires8GiB/mode2 and excludes retainedData/touch')
+    if args.smp_continue and (args.smp_preflight!=8 or not (args.retained_data or args.fresh_data) or args.brightness_mode!=3 or
+        not args.gui_watch or args.gui_user_stacks or args.gui_kernel_stacks or args.gui_runnable_kernel_stacks or
+        args.touch_probe or not args.data_seed):
+        parser.error("eight-core continuation requires retained dim GUI without CPU0 stack reads or short touch probes")
+    if args.smp_preflight and (args.smp_preflight!=8 or args.early_watchdog!=1 or (not args.smp_continue and (not args.no_initrd or
+                              args.data_seed or args.gui_watch or args.display_mode or args.checkpoint))):
+        parser.error("SMP preflight requires rootless/watchdog1 and excludes display/Data/checkpoint")
+    if args.touch_fast_poll and not (args.touch_runtime and args.touch_trace and args.smp_continue):
+        parser.error("--touch-fast-poll requires runtime touch, trace and eight-core GUI")
+    if args.touch_trace and (not args.touch_runtime or args.gui_user_stacks or args.gui_kernel_stacks or args.gui_runnable_kernel_stacks):
+        parser.error("--touch-trace requires runtime touch and excludes GUI stack samplers")
+    if args.touch_edges and not args.touch_runtime:
+        parser.error("--touch-edges requires --touch-runtime")
+    if args.touch_kernel_parser and not args.touch_runtime:
+        parser.error("--touch-kernel-parser requires --touch-runtime")
+    if args.touch_handoff and (not (args.touch_probe or args.touch_runtime) or args.early_watchdog != 1):
         parser.error("touch handoff requires bounded touch probe and early watchdog")
+    if args.touch_calibrate and not args.touch_full:
+        parser.error("--touch-calibrate requires --touch-full")
+    if args.touch_full and not args.touch_frames:
+        parser.error("--touch-full requires --touch-frames")
     if args.touch_frames and not args.touch_identify:
         parser.error("--touch-frames requires --touch-identify")
     if args.touch_identify and not (args.touch_handoff and args.touch_probe):
         parser.error("touch ID requires probe and native handoff")
     if args.retained_data and (args.data_store_mode!=2 or not args.data_permissions):
         parser.error("--retained-data requires mode2 and guarded Data metadata policy")
+    if args.touch_runtime:
+        if not (args.touch_handoff and args.hid_family and args.retained_data and args.gui_watch and args.early_watchdog==1 and args.display_mode==3 and args.brightness_mode==3) or args.touch_probe or args.touch_identify or args.touch_frames or args.touch_full or args.touch_calibrate:
+            parser.error("runtime touch requires guarded dim/retained/HID GUI and excludes short probes")
     if args.touch_probe:
         if args.display_mode!=3 or args.early_watchdog!=1 or args.brightness_mode or (args.checkpoint and args.checkpoint!="TOUCHRO"):
             parser.error("touch probe requires CPU display/watchdog, no brightness transaction, TOUCHRO checkpoint")
@@ -242,7 +297,7 @@ def main():
         parser.error("--gui-backboard-thread requires --gui-user-stacks and an ordinal 0..63")
     if args.development_wifi_identity and args.display_mode != 3:
         parser.error("--development-wifi-identity requires the CPU GUI profile")
-    if args.data_permissions and (not args.minimal_services or not args.gui_launchservices):
+    if args.data_permissions and (not args.minimal_services or (not args.gui_launchservices and not args.smp_continue)):
         parser.error("--data-permissions requires --minimal-services and --gui-launchservices")
     if args.keystore_state and (args.display_mode != 3 or not args.data_seed):
         parser.error("--keystore-state requires --display-mode 3 and an independent RAM Data seed")
@@ -288,8 +343,9 @@ def main():
         sys.path.insert(0, str(REPO / "UniXNU/drivers/DarwinBoot/Test"))
         import packed_ramdisk
         seed, _ = packed_ramdisk.inspect(root_img)
-        if not seed["packed"] or seed["bytes"] > 2 * 1024**3:
-            parser.error("volatile Data requires a packed seed no larger than 2 GiB")
+        expected_bytes=8*1024**3 if args.data_profile=='8g' else 512*1024**2
+        if not seed['packed'] or seed['bytes']!=expected_bytes or (args.data_profile=='8g' and args.data_store_mode!=2 and args.data_store_mode!=1):
+            parser.error('Data seed size must match the explicit profile and store mode')
     for path in (toml, kernel, adt) + (() if args.no_initrd else (root_img,)):
         if not path.is_file():
             sys.exit(f"missing {path}")
@@ -298,7 +354,7 @@ def main():
         xnu = [e for e in entries if e.get("type") == "xnu"]
         if len(xnu) != 1 or xnu[0].get("initrd") or "rd=md0" not in xnu[0].get("args", "").split():
             sys.exit("--no-initrd requires one XNU entry with rd=md0 and no initrd")
-    if args.data_seed or args.display_mode or args.checkpoint:
+    if args.data_seed or args.display_mode or args.checkpoint or args.smp_preflight:
         parts = toml.read_text().split("[[entry]]")
         count = 0
         for index in range(1, len(parts)):
@@ -309,19 +365,24 @@ def main():
                 parser.error("Data seed requires a UFS md0 XNU entry without another initrd")
             if args.data_seed:
                 parts[index] += '\ninitrd = "Payloads/data.dbr"\n'
-            if args.display_mode or args.checkpoint or args.shared_data_volume:
+            if args.display_mode or args.checkpoint or args.shared_data_volume or args.smp_preflight:
                 import json
                 tokens = entry.get("args", "").split()
                 tokens = [t for t in tokens if t != "-apfs_shared_datavolume"]
                 if args.shared_data_volume:
                     tokens.append("-apfs_shared_datavolume")
                 checkpoint = args.checkpoint
+                if args.smp_preflight:
+                    tokens=[t for t in tokens if not t.startswith(("zorn_smp_preflight=","sheng-smp=","armcpu-self-ipi=","cpus=","zorn_checkpoint=","sheng-smp-gic=","sheng-smp-spi="))]
+                    tokens += ["zorn_smp_preflight=8","sheng-smp=1","armcpu-self-ipi=1","cpus=8"]
+                    if args.smp_continue:tokens.append("zorn_smp_continue=1")
+                    checkpoint=args.checkpoint or "NOHIT"
                 if args.display_mode:
                     prefixes = ("offline-mobile-graphics-load=", "offline-legacy-register=", "offline-legacy-gop=",
                                 "offline-legacy-phase=", "zorn_display=", "zorn_exec_budget=",
                                 "offline-legacy-pm=", "offline-legacy-validate=", "offline-legacy-transfer=",
                                 "offline-legacy-cpu-present=", "sheng-vsync=", "wfi=", "armcpu-diagnostics=", "zorn_gui_watch=", "zorn_gui_hold=",
-                                "offline-key-events=", "sheng-aks=", "zorn_data_store=", "zorn_data_retained=", "zorn_brightness=", "zorn_touch=", "zorn_gui_quiet=", "zorn_hid_family=", "zorn_gui_stack=", "zorn_gui_kstack=", "zorn_gui_krun=", "zorn_gui_service=", "zorn_gui_service_thread=", "zorn_gui_backboard_thread=",
+                                "offline-key-events=", "sheng-aks=", "zorn_data_store=", "zorn_data_retained=", "zorn_brightness=", "zorn_touch=", "zorn_touch_edges=", "zorn_touch_kernel_parser=", "zorn_touch_trace=", "zorn_touch_fast=", "zorn_gui_quiet=", "zorn_hid_family=", "zorn_gui_stack=", "zorn_gui_kstack=", "zorn_gui_krun=", "zorn_gui_service=", "zorn_gui_service_thread=", "zorn_gui_backboard_thread=",
                                 "sheng-disable-jobs=", "sheng-disable-watchdogd=", "sheng-lite=", "zorn_data_permissions=")
                     tokens = [t for t in tokens if not t.startswith(prefixes)]
                     tokens += ["offline-mobile-graphics-load=1", "offline-legacy-register=1",
@@ -329,8 +390,18 @@ def main():
                     if args.display_mode >= 2:
                         tokens.append("zorn_exec_budget=180")
                     if args.display_mode == 3:
+                        if args.touch_runtime:
+                            tokens.append("zorn_touch=6")
+                        if args.touch_fast_poll:
+                            tokens.append("zorn_touch_fast=1")
+                        if args.touch_trace:
+                            tokens.append("zorn_touch_trace=1")
+                        if args.touch_edges:
+                            tokens.append("zorn_touch_edges=1")
+                        if args.touch_kernel_parser:
+                            tokens.append("zorn_touch_kernel_parser=1")
                         if args.touch_probe:
-                            tokens.append("zorn_touch=3" if args.touch_frames else "zorn_touch=2" if args.touch_identify else "zorn_touch=1")
+                            tokens.append("zorn_touch=5" if args.touch_calibrate else "zorn_touch=4" if args.touch_full else "zorn_touch=3" if args.touch_frames else "zorn_touch=2" if args.touch_identify else "zorn_touch=1")
                         if args.brightness_mode:
                             tokens.append("zorn_brightness=" + str(args.brightness_mode))
                         if args.retained_data:
@@ -410,7 +481,8 @@ def main():
                                 with_trust_cache=bool(args.trust_cache), packed_data=bool(args.data_seed),
                                 owned_memory=args.memory_mib * 1024**2 if args.memory_mib else None,
                                 cpu_fixups=cpu_fixups,
-                                wifi_identity=development_wifi_identity() if args.development_wifi_identity else None)
+                                wifi_identity=development_wifi_identity() if args.development_wifi_identity else None,
+                                smp_preflight=args.smp_preflight,smp_continue=args.smp_continue)
         adt = out.parent / "payload-with-trustcache.adt"
         adt.write_bytes(handoff)
         print(f"loader ADT {len(handoff)} bytes; initrd={'omitted' if args.no_initrd else 'present'}")
