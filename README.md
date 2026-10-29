@@ -1,29 +1,15 @@
 # uefi-zorn
 
-**当前进度（2026-10-28）：已进入 iPadOS 系统锁屏，机主在现场确认；当前优先适配触控。** CPU0 保持，多核及硬件 GPU 后置。尚未验证触摸解锁或桌面操作。
-
-[硬件低亮度](docs/progress-2026-10-28-brightness.md)已通过一次完整锁屏启动，DCS307→64并读回64；[Data](docs/progress-2026-10-28-data-smp-touch.md)首次跨重启读回同一初始化标志。第二次复测被亮度交接保护提前拒绝并自动回 recovery，未到 Data；因此尚不宣称重复启动稳定。现有 overlay 保留。
-
-[触控记录](docs/progress-2026-10-28-touch.md)：真实芯片为 FT3683；首轮只读 XNU 探针证明触控 SE 时钟关闭、GPIO未启用。K80 专属 L14/3.2V 与 L12/1.8V 原生交接已在短测走通，时钟开启、控制器空闲。`bce3bdbe` 已实测读到芯片 ID `3683`、固件 `35`，三条读取均首次 CRC 通过并恢复 GPIO；下一步采集真实触点帧。按[启动与抓日志说明](docs/touch-test-instructions.md)回传结果（提供 Windows PowerShell 命令行包，仅需现有 adb/fastboot，无 Python 依赖）。尚无 HID 或物理触摸成功证据。
-
 红米 K80（zorn，SM8650-AB）的 Mu-Silicium 板级包。设备仓库是 `UniXNU-zorn`，和本仓库分开发布。
 
-**2026-10-27：UEFI 和 DarwinBoot 交接已完成；整机启动已进入原版 launchd 主循环并启动子服务；
-已越过原版 AppleImage4 等待，SystemOS 实际只读挂载与 owner 授权通过。
-尚无 iPadOS 图形桌面。**
-已按机主指令恢复无人值守调试。最新 [GUI 续调记录](docs/progress-2026-10-27-gui.md) 已确认苹果标志和 SpringBoard 退出原因。见 [续调记录](docs/progress-2026-10-27-resumed.md)；
-原有 [暂停快照](docs/progress-2026-10-27.md) 仍保留为历史记录。
-
-SystemOS 已通过真实 UFS 块设备和原版存储栈挂载 `/dev/disk1s1`，只读状态、UUID 及 owner 授权通过（`OWNOK`）；原版 launchd 已输出 ptpd[48]、rapportd[56] 启动日志。UEFI 模式 2 停 CPU 测试已自动回 recovery；模式 1 的内核 `WON` 证明接管时 watchdog 已开启。主机 BCB 写入读回也已真机通过。
-
-本轮新增独立 RAM Data 负载：512 MiB 逻辑 APFS、约 1 MiB DBRDISK1 编码，通过 DarwinBoot 的 `PackedRAMDisk` 交接；真机挂载和文件写入、读回、删除已通过。OS/SystemOS 仍是 UFS 只读输入，该历史易失配置已由10月28日受限 overlay 接入替代，最新资格见上文。历史完整记录见 [RAM Data 进度](docs/progress-2026-10-27-ram-data.md)。
+**当前进度（2026-10-28）：已进入 iPadOS 系统锁屏，机主在现场确认；当前优先适配触控。** CPU0 保持，多核及硬件 GPU 后置。尚未验证触摸解锁或桌面操作。
 
 本仓库不是一份完整的 Mu-Silicium。Common、Silicon、ACPI 和上游 BootShim 留在 Mu-Silicium 检出里。`--uefi` 指向链入本板级包之后的那份检出，见 [UEFI 固件](https://unixnu.com/zh/porting/uefi-firmware)。
 
 现有 SM8650 DXE 依赖 Mu-Silicium 中的 giulia 二进制输入；这些依赖、IPSW、
 固件 FD 和启动镜像不随本仓库提交。前几轮复用旧 FD；新增提前 watchdog 的 FD 已构建，默认无 marker 时该逻辑不启用；模式 1/2 的实际结果见续调记录。
 
-```
+```text
 BootShim/BootShim.S                 本机 shim：页对齐，邮箱 0xA7601000
 Platforms/Xiaomi/zornPkg/           DSC、FDF、内存图、ZornBootMemoryDxe
 Resources/Configs/zorn.toml         固件基址和 Android 启动镜像头
@@ -116,20 +102,48 @@ python3 uefi-zorn/scripts/package-zorn-boot.py \
 
 `root.img` 是早前使用的 `DBRDISK1` 恢复内存盘。当前验证策略候选省去它，菜单无 `initrd`；派生 ADT 也必须无 RAMDisk/PackedRAMDisk。DarwinBoot 会拒绝只删文件却保留占位的组合，打包器已处理并检查这一点。userdata 上只读 OS 为 `md0`；`md1` 是历史 SystemOS raw 诊断设备，正常 SystemOS 挂载使用真实 UFS IOBlockStorageDevice 发布的 IOMedia。独立 RAM Data 配置会保留合法的 PackedRAMDisk，不能套用只读基线的 --no-initrd。
 
+`--no-initrd` 会移除派生 chosen 中旧的 `ephemeral-storage` 声明；
+独立 RAM Data 负载则同时生成 PackedRAMDisk 和对应临时存储标记。原始 ADT 保持不变。
+
 启动前用 `fastboot -s 92988a43 getvar product` 和 `fastboot -s 92988a43 getvar current-slot` 核对 zorn／槽位 b，再用 `fastboot -s 92988a43 boot out/zorn/boot.img` 临时启动。无人值守调试使用 `python3 UniXNU-zorn/scripts/run-zorn-debug.py`，检查点或独立超时会设置 recovery BCB 并复位，详细范围见设备仓库说明。不要写 `boot`、`super`、`vbmeta`、`vendor_boot`，不要 `erase`，不要改槽位。`userdata` 上的系统卷由 UniXNU-zorn 说明，不要再刷。
 
+## 临时网络身份对照
+
+`make-zorn-payload.py --development-wifi-identity` 仅在 CPU GUI profile 下，
+为 `/chosen/mac-address-wifi0` 提供从专用开发命名空间与 K80 序号派生的稳定本地单播地址。
+这不是出厂 MAC 或 Wi-Fi 联网实现。默认关闭；拒绝长度、地址类型错误及现存冲突值。
+移除新增属性后应逐字还原控制 ADT。首轮实机结果记入 GUI 续调文档。
+
 ## 进度
+
+[硬件低亮度](docs/progress-2026-10-28-brightness.md)已通过一次完整锁屏启动，DCS307→64并读回64；[Data](docs/progress-2026-10-28-data-smp-touch.md)首次跨重启读回同一初始化标志。第二次复测被亮度交接保护提前拒绝并自动回 recovery，未到 Data；因此尚不宣称重复启动稳定。现有 overlay 保留。
+
+[触控记录](docs/progress-2026-10-28-touch.md)：真实芯片为 FT3683；首轮只读 XNU 探针证明触控 SE 时钟关闭、GPIO 未启用。K80 专属 L14 / 3.2 V 与 L12 / 1.8 V 原生交接已在短测走通，时钟开启、控制器空闲。`bce3bdbe` 已实测读到芯片 ID `3683`、固件 `35`，三条读取均首次 CRC 通过并恢复 GPIO；下一步采集真实触点帧。按[启动与抓日志说明](docs/touch-test-instructions.md)回传结果（提供 Windows PowerShell 命令行包，仅需现有 adb/fastboot，无 Python 依赖）。尚无 HID 或物理触摸成功证据。
+
+2026-10-27 的阶段记录：UEFI 和 DarwinBoot 交接已完成；整机启动已进入原版 launchd 主循环并启动子服务；
+已越过原版 AppleImage4 等待，SystemOS 实际只读挂载与 owner 授权通过。
+尚无 iPadOS 图形桌面。
+已按机主指令恢复无人值守调试。最新 [GUI 续调记录](docs/progress-2026-10-27-gui.md) 已确认苹果标志和 SpringBoard 退出原因。见 [续调记录](docs/progress-2026-10-27-resumed.md)；
+原有 [暂停快照](docs/progress-2026-10-27.md) 仍保留为历史记录。
+
+SystemOS 已通过真实 UFS 块设备和原版存储栈挂载 `/dev/disk1s1`，只读状态、UUID 及 owner 授权通过（`OWNOK`）；原版 launchd 已输出 ptpd[48]、rapportd[56] 启动日志。UEFI 模式 2 停 CPU 测试已自动回 recovery；模式 1 的内核 `WON` 证明接管时 watchdog 已开启。主机 BCB 写入读回也已真机通过。
+
+早期独立 RAM Data 负载：512 MiB 逻辑 APFS、约 1 MiB DBRDISK1 编码，通过 DarwinBoot 的 `PackedRAMDisk` 交接；真机挂载和文件写入、读回、删除已通过。OS/SystemOS 仍是 UFS 只读输入，该历史易失配置已由 10 月 28 日受限 overlay 接入替代，最新资格见本节。历史完整记录见 [RAM Data 进度](docs/progress-2026-10-27-ram-data.md)。
+
+GUI 诊断候选通过统一构建器的 `--gui-watch` 显式启用，依赖 display-mode 3。
+`07ebe68e` 是恢复连接后的早期 GUI 诊断镜像，现已临时启动回收；后续增加固定诊断区。
+当前结果见 [GUI 续调记录](docs/progress-2026-10-27-gui.md)，早期 [RAM Data 快照](docs/snapshot-2026-10-27-ram-data.json) 保留为历史身份。
 
 固件已经在真机上进过菜单。菜单标题是 Redmi K80，配置路径是 `\EFI\UniXNU\unixnu.toml`，倒计时 5 秒，然后把 `Boot XNU` 交给 DarwinBoot。
 
 `ZornBootMemoryDxe` 只扫描 `EFI_MEMORY_WB`。邮箱在 DXE 阶段经常已经不在，驱动就在内核窗口里按 512 字节找 FAT 引导扇区，把整卷复制到 `EfiBootServicesData`，再挂载并打开配置。
 
-2026-10-27 已通过 UFS 只读根、两块原版 trust cache、SIGPASS、INITOK、
+2026-10-27 早期记录：已通过 UFS 只读根、两块原版 trust cache、SIGPASS、INITOK、
 PMGR 对象/服务发布、PAN 用户拷贝及第 32 次 EL0 SVC；已采到 PID1 的 libignition 文本。
-当前自然停止是 `security.mac.img4.ignition_blob` 的原版处理函数进入后未返回，
+当时的自然停止是 `security.mac.img4.ignition_blob` 的原版处理函数进入后未返回，
 独立 watchdog 随后自动进入 recovery。SystemOS 的单独挂载、可写 Data 和图形系统仍待完成。
 
-当前菜单保留 `zorn_pmgr=2`、纯日志、55 秒独立超时与第 64 次 SVC 的诊断参数。
+该早期菜单保留 `zorn_pmgr=2`、纯日志、55 秒独立超时与第 64 次 SVC 的诊断参数。
 第 64 次检查点尚未命中，不能把自动超时当成检查点通过。UFS 后启用纯日志时
 屏幕词不再更新，以 recovery 读回的持久日志为准。
 
@@ -139,18 +153,3 @@ PMGR 对象/服务发布、PAN 用户拷贝及第 32 次 EL0 SVC；已采到 PID
 ## 许可
 
 `Platforms/` 里的上游文件保留各自的版权头。本仓库新增的文件使用 [LICENSE](LICENSE) 的 BSD-2-Clause-Patent。
-
-`--no-initrd` 会移除派生 chosen 中旧的 `ephemeral-storage` 声明；
-独立 RAM Data 负载则同时生成 PackedRAMDisk 和对应临时存储标记。原始 ADT 保持不变。
-
-GUI 诊断候选通过统一构建器的 `--gui-watch` 显式启用，依赖 display-mode 3。
-`07ebe68e` 是恢复连接后的早期 GUI 诊断镜像，现已临时启动回收；后续增加固定诊断区。
-当前结果见 [GUI 续调记录](docs/progress-2026-10-27-gui.md)，早期 [RAM Data 快照](docs/snapshot-2026-10-27-ram-data.json) 保留为历史身份。
-
-
-## 临时网络身份对照
-
-`make-zorn-payload.py --development-wifi-identity` 仅在 CPU GUI profile 下，
-为 `/chosen/mac-address-wifi0` 提供从专用开发命名空间与 K80 序号派生的稳定本地单播地址。
-这不是出厂 MAC 或 Wi-Fi 联网实现。默认关闭；拒绝长度、地址类型错误及现存冲突值。
-移除新增属性后应逐字还原控制 ADT。首轮实机结果记入 GUI 续调文档。
