@@ -73,7 +73,7 @@ python3 uefi-zorn/scripts/build-zorn-firmware.py --uefi /path/to/Mu-Silicium
 
 输出为 Mu-Silicium 的 `Build/zornPkg/DEBUG_CLANGPDB/FV/SILICIUM_UEFI.fd`，必须为 3 MiB。负载和完整桌面调试镜像由设备仓库统一构建器生成，见 [固件构建说明](docs/build-and-handoff.md)。
 
-本次只整理文档与移植记录，保留现有格式 1 构建入口。全新检出的 XNU 补丁重放仍有未解决冲突；现有增量成功结果不等于完整可复现发行版。`stage-into-mu.sh` 只建立本机链接，不创建或发布额外仓库。
+说明按格式 2 的区域组织，实际保留格式 1 构建入口。独立源码快照的路径布局对照 `3a8ac966` 已连续两次进入桌面；沿用原已验证 FD，没有重建或刷写固件。历史 ABI 输入和布局依赖仍须处理，见 [构建回归记录](docs/progress-2026-10-29-repro-build.md)。`stage-into-mu.sh` 只建立本机链接，不创建或发布额外仓库。
 
 ## 启动与回收
 

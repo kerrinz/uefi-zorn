@@ -10,7 +10,7 @@ PINS={'RpmhDxe':'cdebce5c9f96d16e71a0db8f9c4dbf591ed314dd94a6543b08c238902df6526
       'ClockDxe':'b1608ab9a4759dbbc50e5e5836ee402ff832d8076011e5145460e4af97ba7686'}
 inputs={}
 for name,sha in PINS.items():
-    path=BLOBS/name/(name+'.efi'); data=path.read_bytes()
+    path=(BLOBS/name/(name+'.efi')).resolve(); data=path.read_bytes()
     assert hashlib.sha256(data).hexdigest()==sha,'native provider changed: '+name
     inputs[str(path)]=sha
     if name=='RpmhDxe':
