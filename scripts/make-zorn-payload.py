@@ -189,6 +189,8 @@ def main():
     parser.add_argument("--smp-preflight",type=int,choices=(0,8),default=0,
                         help="eight-core pre-root qualification, no Data publication")
     parser.add_argument("--smp-continue",action="store_true",help="continue passed eight-core checks into retained dim GUI")
+    parser.add_argument("--smp-stop-after-pass", action="store_true", help="recover after all eight-core checks, before root/Data publication")
+    parser.add_argument("--smp-root-publication",type=int,choices=(0,1),default=0,help="explicit single-root cache publication experiment")
     parser.add_argument("--toml", type=Path, default=ROOT / "payload/EFI/UniXNU/unixnu.toml")
     parser.add_argument("--kernel", type=Path, default=REPO / "UniXNU/out/zorn/kernel/kernel.macho")
     parser.add_argument("--adt", type=Path, default=REPO / "out/zorn/kernel.macho.adt")
@@ -198,6 +200,8 @@ def main():
     parser.add_argument("--display-mode", type=int, choices=(1, 2, 3), help="display lifecycle (1), publication (2), or CPU presentation (3)")
     parser.add_argument("--memory-mib", type=int, help="derive an owned window of 256..8192 MiB, allocated by UEFI from actual free memory")
     parser.add_argument("--gui-watch", action="store_true", help="opt-in bounded passive GUI process/thread observations")
+    parser.add_argument("--cpu-active-observation", action="store_true", help="bounded active-only accounting for fixed new eight-core GUI")
+    parser.add_argument("--display-progress", action="store_true", help="opt-in v19 retirement/vsync counters in eight-core retained GUI")
     parser.add_argument("--gui-user-stacks", action="store_true", help="opt-in bounded original-VM GUI frame reads with independent timeout recovery")
     parser.add_argument("--gui-kernel-stacks", action="store_true", help="bounded nofault capture of blocked GUI kernel stacks; single CPU only")
     parser.add_argument("--gui-runnable-kernel-stacks", action="store_true", help="also inspect referenced, non-current runnable kernel contexts; explicit CPU0 diagnostic")
@@ -237,6 +241,23 @@ def main():
     parser.add_argument("--trust-cache", type=Path, help="unchanged original 21H461 static+System bundle")
     parser.add_argument("-o", "--output", type=Path, default=REPO / "out/zorn/payload.img")
     args = parser.parse_args()
+    if args.display_progress and (not (args.smp_preflight == 8 and args.smp_continue and
+        args.smp_root_publication == 1 and not args.smp_stop_after_pass and args.gui_watch and
+        args.touch_trace and args.touch_runtime and args.retained_data and not args.fresh_data and
+        args.data_profile == '8g' and args.memory_mib == 8192 and args.early_watchdog == 1) or
+        args.gui_user_stacks or args.gui_kernel_stacks or args.gui_runnable_kernel_stacks):
+        parser.error('display progress requires eight-core retained8GiB GUI/trace/watchdog1; no stack samplers')
+    if args.cpu_active_observation and (not (args.display_progress and args.smp_preflight==8 and args.smp_continue and
+        args.smp_root_publication==1 and not args.smp_stop_after_pass and args.gui_watch and
+        args.touch_trace and args.touch_runtime and args.retained_data and not args.fresh_data and
+        args.data_profile=='8g' and args.memory_mib==8192 and args.early_watchdog==1 and
+        args.gui_hold_seconds==300 and args.display_mode==3 and args.brightness_mode==3 and args.data_store_mode==2) or
+        args.gui_user_stacks or args.gui_kernel_stacks or args.gui_runnable_kernel_stacks):
+        parser.error('CPU active observation requires retained8GiB eight-core300s dim64/trace/progress/watchdog1; no stop or stacks')
+    if args.smp_root_publication and args.smp_preflight!=8:
+        parser.error("root publication requires eight-core preflight")
+    if args.smp_stop_after_pass and not args.smp_continue:
+        parser.error('--smp-stop-after-pass requires the explicit continuation profile')
     if args.fresh_data and (args.data_profile!='8g' or args.data_store_mode!=2 or args.retained_data or args.touch_runtime):
         parser.error('fresh Data requires8GiB/mode2 and excludes retainedData/touch')
     if args.smp_continue and (args.smp_preflight!=8 or not (args.retained_data or args.fresh_data) or args.brightness_mode!=3 or
@@ -373,15 +394,17 @@ def main():
                     tokens.append("-apfs_shared_datavolume")
                 checkpoint = args.checkpoint
                 if args.smp_preflight:
-                    tokens=[t for t in tokens if not t.startswith(("zorn_smp_preflight=","sheng-smp=","armcpu-self-ipi=","cpus=","zorn_checkpoint=","sheng-smp-gic=","sheng-smp-spi="))]
+                    tokens=[t for t in tokens if not t.startswith(("zorn_smp_preflight=","zorn_smp_continue=","zorn_smp_stop=","zorn_smp_root_publish=","sheng-smp=","armcpu-self-ipi=","cpus=","zorn_checkpoint=","sheng-smp-gic=","sheng-smp-spi="))]
                     tokens += ["zorn_smp_preflight=8","sheng-smp=1","armcpu-self-ipi=1","cpus=8"]
                     if args.smp_continue:tokens.append("zorn_smp_continue=1")
+                    if args.smp_stop_after_pass:tokens.append("zorn_smp_stop=1")
+                    tokens.append("zorn_smp_root_publish="+str(args.smp_root_publication))
                     checkpoint=args.checkpoint or "NOHIT"
                 if args.display_mode:
                     prefixes = ("offline-mobile-graphics-load=", "offline-legacy-register=", "offline-legacy-gop=",
                                 "offline-legacy-phase=", "zorn_display=", "zorn_exec_budget=",
                                 "offline-legacy-pm=", "offline-legacy-validate=", "offline-legacy-transfer=",
-                                "offline-legacy-cpu-present=", "sheng-vsync=", "wfi=", "armcpu-diagnostics=", "zorn_gui_watch=", "zorn_gui_hold=",
+                                "offline-legacy-cpu-present=", "sheng-vsync=", "wfi=", "armcpu-diagnostics=", "zorn_gui_watch=", "zorn_display_progress=", "zorn_cpu_active=", "zorn_gui_hold=",
                                 "offline-key-events=", "sheng-aks=", "zorn_data_store=", "zorn_data_retained=", "zorn_brightness=", "zorn_touch=", "zorn_touch_edges=", "zorn_touch_kernel_parser=", "zorn_touch_trace=", "zorn_touch_fast=", "zorn_gui_quiet=", "zorn_hid_family=", "zorn_gui_stack=", "zorn_gui_kstack=", "zorn_gui_krun=", "zorn_gui_service=", "zorn_gui_service_thread=", "zorn_gui_backboard_thread=",
                                 "sheng-disable-jobs=", "sheng-disable-watchdogd=", "sheng-lite=", "zorn_data_permissions=")
                     tokens = [t for t in tokens if not t.startswith(prefixes)]
@@ -412,6 +435,10 @@ def main():
                             tokens += ["offline-key-events=1", "sheng-aks=1"]
                         if args.gui_watch:
                             tokens.append("zorn_gui_watch=1")
+                        if args.display_progress:
+                            tokens.append("zorn_display_progress=1")
+                        if args.cpu_active_observation:
+                            tokens.append("zorn_cpu_active=1")
                         if args.gui_user_stacks:
                             tokens.append("zorn_gui_stack=1")
                         if args.gui_kernel_stacks:

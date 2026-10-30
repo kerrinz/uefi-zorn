@@ -1,6 +1,6 @@
 # K80 固件构建与交接
 
-本文记录现有格式 1 设备构建入口；整机结构化记录维护于相邻的 `UniXNU-zorn/porting.toml`。本次整理不重新构建、不启动手机、不改变现有归档。
+本文记录显式保留的格式 1 调试入口；设备根配置已迁移格式 2，但固件构建器显式选择固定兼容配置；整机结构化记录维护于相邻的 `UniXNU-zorn/porting.toml`。本次整理不重新构建、不启动手机、不改变现有归档。
 
 ## 板级包与上游
 
@@ -20,7 +20,8 @@ sh uefi-zorn/scripts/stage-into-mu.sh /path/to/Mu-Silicium
 
 ```sh
 # 在 UniXNU 目录执行
-./unixnu defconfig zorn_defconfig -D ../UniXNU-zorn
+python3 ../UniXNU-zorn/scripts/prepare-zorn-legacy-view.py
+./unixnu defconfig zorn_defconfig -D ../out/zorn/legacy-device
 ```
 
 ```sh
@@ -57,3 +58,7 @@ BootShim、FD 与 FAT 解压后须适合 `0xA8000000`–`0xB8000000` 的 256 MiB
 `42f3d518` 的完整身份见 [桌面触控证据](evidence/touch-desktop-fast-qualified.json)：机主确认进入桌面及单指基本交互，八核检查、保留 Data 标志和亮度读回一起通过，自动回收取得新日志。GPIO 轮询触控、多指未验收、CPU1 前序偶发预检早退、无硬件 GPU 及长期稳定性均仍有边界。
 
 亮度 64 是 XNU 阶段 DCS 控制的读回值，不是校准百分比，也不表示 UEFI 菜单或系统亮度滑块已适配。旧日期阶段文档中的未完成描述只代表当时状态。
+
+## 2026-10-30 同步说明
+
+最新非GPU结果见 [同步摘要](progress-2026-10-30-non-gpu.md)。c50已自动回收且观察名额已消耗；CPU1窄发布结果与历史苹果标志GUI失败分开保留。本次迁移没有重建FD、触屏或启动手机。整机格式2元数据及验证边界仍以相邻设备仓库的 `docs/repository-format.md` 和 `porting.toml` 为准。

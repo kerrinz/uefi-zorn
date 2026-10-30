@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
@@ -15,7 +16,11 @@ args = parser.parse_args()
 args.uefi = args.uefi.resolve()
 subprocess.run(["python3", str(ROOT / "uefi-zorn/scripts/check-zorn-touch-power.py")], check=True)
 if not args.record_existing:
-    subprocess.run([ROOT / "UniXNU/unixnu", "build", "firmware", "--uefi", args.uefi], cwd=ROOT / "UniXNU", check=True)
+    sys.path.insert(0, str(ROOT / 'UniXNU-zorn/scripts'))
+    from zorn_legacy_device import prepare as prepare_legacy_device
+    device = prepare_legacy_device(ROOT / 'UniXNU-zorn', ROOT / 'out/zorn/legacy-device')
+    subprocess.run([ROOT / "UniXNU/unixnu", "build", "firmware", "-D", device,
+                    "--uefi", args.uefi], cwd=ROOT / "UniXNU", check=True)
 build = args.uefi / "Build/zornPkg/DEBUG_CLANGPDB"
 fd = build / "FV/SILICIUM_UEFI.fd"
 modules = [p for p in build.rglob("ZornBootMemoryDxe.efi") if p.parent.name == "OUTPUT"]
