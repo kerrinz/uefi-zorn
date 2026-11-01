@@ -1,5 +1,7 @@
 # K80 固件构建与交接
 
+> 当前设备已改为slotA + Android +独立unixnu64。先阅读[新存储布局](storage-unixnu64.md)。下文slotB/userdata/192GiB命令属于历史配置；不可用于当前设备，尤其不可执行generic输出的flash userdata。历史兼容board及资格清单原样保留。
+
 本文记录显式保留的格式 1 调试入口；设备根配置已迁移格式 2，但固件构建器显式选择固定兼容配置；整机结构化记录维护于相邻的 `UniXNU-zorn/porting.toml`。本次整理不重新构建、不启动手机、不改变现有归档。
 
 ## 板级包与上游

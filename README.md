@@ -12,7 +12,7 @@ Official format-2 device documentation is generated from that device repository'
 
 As of 2026-10-30, the combined port has owner-confirmed desktop and basic single-touch interaction, eight-core checks, retained 8 GiB Data, an 8 GiB XNU window and brightness 64. The CPU1 narrow root-publication fix has same-kernel controls and two-layout evidence. A later Apple-logo GUI failure remains unresolved; the final `c50ca7ea` observation showed a lock screen and all-core accounting progress, then recovered automatically. It does not qualify performance, system multi-touch or long-term stability.
 
-The firmware handoff includes the UEFI menu, five-second countdown, DarwinBoot, GOP and the existing touch power handoff. The latest CPU / display observations reused the recorded FD; no new firmware or phone run is implied by this update. Non-GPU results and their limits are synchronized in the [progress snapshot](docs/progress-2026-10-30-non-gpu.md). GPU development progress is outside this update.
+The firmware handoff includes the UEFI menu, five-second countdown, DarwinBoot, GOP and the existing touch power handoff. The latest CPU / display observations reused the recorded FD; no new firmware or phone run is implied by this update. Non-GPU results and their limits are synchronized in the [progress snapshot](docs/progress-2026-10-30-non-gpu.md). Ongoing GPU software work is recorded separately below.
 
 ## Prerequisites
 
@@ -54,10 +54,16 @@ The BootShim window, FAT allocation and XNU-owned memory window are separate. Do
 
 ## Temporary boot and recovery
 
-Use UniXNU-zorn's fixed-target runner with a matching ready / input manifest and independent watchdog. The only target is `92988a43` / `zorn` / slot `b`; `f85d4270` is a CC9 and must not be operated on. No flash, erase, slot or GPT changes.
+Use UniXNU-zorn's fixed-target runner with a matching ready / input manifest and independent watchdog. The current dedicated-storage target is `92988a43` / `zorn` / slot `a`; `f85d4270` is a CC9 and must not be operated on. No flash, erase, slot or GPT changes.
 
-Do not boot Android or reinstall userdata. OS / SystemOS stay read-only. Data, the single log block and recovery BCB retain the exact bounds in the device record; firmware packaging does not expand those permissions. The default `42f3d518` and two desktop-confirmed `3a8ac966` baselines remain preserved. Automatic work is currently paused at the owner's request.
+After the owner-requested stock reflash and reinstall, iOS occupies a dedicated64GiB `unixnu` partition. Android userdata is preserved and must never receive the raw iOS image. Initial8GiB Data is unixnu-relative16GiB; the single log block is unixnu-relative2291712. OS/SystemOS remain read-only at runtime; BCB tail/full-page checks remain. Use the matching compiled-kernel storage proof when packing. See [current storage layout and verified runs](docs/storage-unixnu64.md). The default `42f3d518` and two desktop-confirmed `3a8ac966` baselines remain preserved. The owner has resumed unattended GPU adaptation after the Git/documentation pause; the original device protections remain in force.
 
 ## License
 
 New files use [BSD-2-Clause-Patent](LICENSE); upstream files retain their notices. Apple inputs, vendor binaries and generated firmware / boot images are not committed here.
+
+## GPU scope
+
+GPU-owned memory preparation and its closed diagnostic helpers are published as implemented source. Hardware GPU execution, rendering and Metal remain unqualified. Detailed research summaries are retained in [GPU progress](docs/progress-2026-10-30-gpu.md); many isolated capsules and large logs are local archives, not a runnable production driver. Historical input counts describe their own frozen runs.
+
+The current stock-reflash/unixnu64 installation and owner-confirmed retained Data/touch are documented in [storage-unixnu64](docs/storage-unixnu64.md). Old userdata/slotB images must not be booted on that layout.

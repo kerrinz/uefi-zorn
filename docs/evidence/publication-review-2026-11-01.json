@@ -1,0 +1,148 @@
+{
+  "review_date": "2026-11-01",
+  "repository": "uefi-zorn",
+  "source_revision": "6b832589bc8e19d440147ffaf57bcab4f6862c92",
+  "dependency_code_revisions": {
+    "UniXNU-zorn": "5c42733315d2428e63fe3a1b98cc56fe8d6cfd9c",
+    "uefi-zorn": "6b832589bc8e19d440147ffaf57bcab4f6862c92"
+  },
+  "UniXNU_revision": "627c932a1573483dd44c29b48a113c3761dd8f55",
+  "commands": [
+    "python3 UniXNU-zorn/scripts/check-zorn-unixnu64-admission.py",
+    "python3 uefi-zorn/scripts/check-zorn-storage-profile.py",
+    "UNIXNU_ZORN_HOST_CHECK_OUT=\"$PWD/out/zorn/publication-host-check\" python3 UniXNU-zorn/scripts/check-zorn-gpu-owned-memory.py"
+  ],
+  "source_file_sha256": {
+    "payload/storage/unixnu64.json": "2ff3bbaec2e937dec1c1fc7f9222f2eb097d7e6745834b2c64e2525e0fc73d89",
+    "scripts/build-zorn-firmware.py": "b4e14b49f6c3f7a007a3f9a349676bb176ac2ec246ab84b62e9a675ecd52432c",
+    "scripts/check-zorn-storage-profile.py": "1f3668ef197dc006797e814d53bc9acf2e091a8af50517f18c8424f7d3381c1a",
+    "scripts/make-zorn-payload.py": "d0926445a8e14835b4687063e284ee10ae3ee18ad59c594c9a0870e495c0210d",
+    "scripts/zorn_gpu_firmware.py": "bcded765b99d46567b0a4bccc56073deb7d6e6b00de6ee4f3520fed1809860db",
+    "scripts/zorn_storage_profile.py": "96e90158845a46fc42baf093a671a3ce8d60254aadeb638f50fbbfe25e1aae68"
+  },
+  "host_inputs": {
+    "UniXNU/drivers/Adreno740/NativeAdrenoBoard.cpp": "273fedfdc89c64abab3195fadd27045f606bdd7868920842117a323c193cbd66",
+    "UniXNU/drivers/Adreno740/NativeAdrenoMemory.cpp": "37363469c9e1f1e200b368e0bfdb80111722861792411090f3cef67506c9adef",
+    "UniXNU/drivers/Adreno740/NativeAdrenoSha256.cpp": "ee624a483a075b8ca44f1dff2efd66acee38c5ccd784192c23614cdb6605db1f",
+    "UniXNU/drivers/Adreno740/tests/XnuMemoryFixture.h": "a6ca900d7e31d5df085019b309c649f35edc3999810a5dcfb31822f52017d1d3",
+    "UniXNU/kits/AdrenoFirmware/AdrenoFirmware.c": "c3cc714a65ce90216a0fc5c6f0e102ae1769c45e559c08f94a0b5f6fa3e97070",
+    "UniXNU-zorn/native/gpu-owned/.DS_Store": "fe4018ca665be6b4db637c2e2c78b1ff7d57908dab5915453d8bf2c63b1e0a96",
+    "UniXNU-zorn/native/gpu-owned/K80GpuResourceProfile.inc": "c32fe4555c2e681bc7782025fe9491dccd2c543a3326cc62459ccba1ba06766f",
+    "UniXNU-zorn/native/gpu-owned/ZornGpuFirmwarePlan.cpp": "4ca37bf5b9e9d5ad831bdc1c24f2dc53f8ba55168b96ef72825d586657cb8513",
+    "UniXNU-zorn/native/gpu-owned/ZornGpuFirmwarePlan.h": "4adb9940c7836f87b66b48740e34afd6d97e205e1a8703b2837b923140d9534e",
+    "UniXNU-zorn/native/gpu-owned/ZornGpuMemoryWire.h": "9cc0b31c601be71b045fc08716ae209454a00a008c6fe9988e979a28157126db",
+    "UniXNU-zorn/native/gpu-owned/ZornGpuNativePlatform.cpp": "f6c21bc5181bf8b685e0fdfebb3a1c1bc3e5868af8c50dba0d9a0e06f685a756",
+    "UniXNU-zorn/native/gpu-owned/ZornGpuNativePlatform.h": "453defe45492cd76d548a11c9434f015f1e3557de57a810caee50f2111829d7d",
+    "UniXNU-zorn/native/gpu-owned/ZornGpuOwnedMemory.cpp": "4bc7f635ac579469ecfc7635f28a775e37b1d2f42e005d48f75610c3cf236a2f",
+    "UniXNU-zorn/native/gpu-owned/ZornGpuOwnedMemory.h": "f4c592bafa0acd781ca48c65514bf19106a6c09b98614c01303897b75ca4a3bc",
+    "UniXNU-zorn/native/gpu-owned/ZornGpuOwnedRuntime.cpp": "72a8c2b5544dac220b06640870bfae247cbb0ff49c00815324c1bac3916c9757",
+    "UniXNU-zorn/native/gpu-owned/ZornGpuOwnedRuntime.h": "92cb2da0f96125bf5572552133a5d6c3bb368d543e19b494221c29a8aca3d7c4",
+    "UniXNU-zorn/native/gpu-owned/ZornGpuOwnedStub.c": "f103cebb170dfe755e1cf1795b1365478835ef7f5d71156eaedbd197856d1b82",
+    "UniXNU-zorn/native/gpu-owned/bsd-caller.patch": "6fb0cf5a496eac713ac58480c14239d16b13f496c773aace501ab918d39c1d81",
+    "UniXNU-zorn/native/gpu-owned/firmware-pins.json": "0cbab76656570fd0c3c79f236b788b11f1e0f308bcf165fcdd32507757aafbd7",
+    "UniXNU-zorn/native/gpu-owned/source-profile.json": "b65567ab7455c419ea038ee27e35fea5cc2248abfbc60a99fe2be82ee41564ef",
+    "UniXNU-zorn/native/gpu-owned/tests/test-runtime.cpp": "0ce1e25bdcceb437e51760dc1e3a6a5bf96eed8a83cf807740182e196fc37b35",
+    "UniXNU-zorn/native/gpu-owned/tests/test-wire.cpp": "18234b559986ee15e90c9dd00da80536caef8facef94e27204ffe78134562dbb",
+    "UniXNU-zorn/scripts/build-zorn-debug.py": "63aa61e4ddcb096014c07f99983d400ce26cb9ca6a0fef118d09ddfe7fefe8d5",
+    "UniXNU-zorn/scripts/check-zorn-gpu-owned-memory.py": "0896ca8a33f09003278778061e56cd677141e4311aba87a07493c9f90af3e103",
+    "UniXNU-zorn/scripts/read-zorn-log.py": "1c9de3a4482b78258039dea7b2f3f4f4890ec5613b454206e8d4bb5a722daeb6",
+    "UniXNU-zorn/scripts/zorn_gpu_memory.py": "def22f2181d764887cb1729e656b9cb7369ebe910d88f863ff6e5235755e6eed",
+    "out/zorn/repository-publication-audit-20261101/committed-gpu-owned-host/include/XnuMemoryFixture.h": "c17c5b37092008516909a0a18bf24e38fd8d3c4232dcc8f784b9ae4efc8c6321",
+    "out/zorn/repository-publication-audit-20261101/committed-gpu-owned-host/stock-firmware.s": "c5e5fd5c449999f8dcde7b6e5fddfd1af62ee8a98ae6574c1576dc14b97cb954",
+    "uefi-zorn/scripts/make-zorn-payload.py": "d0926445a8e14835b4687063e284ee10ae3ee18ad59c594c9a0870e495c0210d"
+  },
+  "host_memory_wire_result": {
+    "wire": {
+      "wire_examples": 11,
+      "fallback_controls": 40,
+      "alias_controls": 2
+    },
+    "cross_language_examples": 11,
+    "corruptions_rejected": 4096,
+    "crc_valid_semantics_rejected": 7,
+    "runtime": [
+      {
+        "mode": 0,
+        "allocations": 0,
+        "cache_calls": 0,
+        "releases": 0
+      },
+      {
+        "mode": 1,
+        "allocations": 8,
+        "cache_calls": 8,
+        "releases": 0
+      },
+      {
+        "mode": 2,
+        "allocations": 0,
+        "cache_calls": 0,
+        "releases": 0
+      },
+      {
+        "mode": 3,
+        "allocations": 1,
+        "cache_calls": 0,
+        "releases": 0
+      }
+    ],
+    "guards": {
+      "UniXNU-zorn/scripts/build-zorn-debug.py": 34,
+      "uefi-zorn/scripts/make-zorn-payload.py": 26
+    },
+    "legacy_restorations": [
+      {
+        "path": "self-contained-v18",
+        "sha256": "8d00d431b0bfcf887c6e211123cfc0a8ae13f9efc1b1bee157379255a55a5679",
+        "source_version": 18,
+        "restored_version": 18,
+        "gpu_state": 2
+      },
+      {
+        "path": "out/zorn/debug/20261030-135043-6aea024f/checkpoints.bin",
+        "sha256": "136bc0cfb31af36e9c145bbc239bf017f661f7b017b8aaba9780b1fd830b5c9b",
+        "source_version": 19,
+        "restored_version": 18,
+        "gpu_state": 2
+      },
+      {
+        "path": "out/zorn/debug/20261030-160910-6aea024f/checkpoints.bin",
+        "sha256": "bda6e26a4f652c3f20d4fdb758f9d724e0962c391a4c32011a2257c677aa947f",
+        "source_version": 19,
+        "restored_version": 18,
+        "gpu_state": 2
+      }
+    ],
+    "allow_boot": false,
+    "hardware_qualified": false,
+    "limits": [
+      "Actual native provider sources with host IOKit/cache doubles; no Apple object/virtual ABI or physical/DMA proof.",
+      "Canonical RAM log unchanged. Wire contains PA/page counts and losslessly representable report errors, not CPU/owner pointers. Incompatible extra error/shape keeps original log and makes GPU observation unavailable.",
+      "CRC detects tested corruption, not authentication. Snapshot release/acquire and caller exclusive writer scratch do not constitute full ARM weak memory proof."
+    ]
+  },
+  "storage_admission": {
+    "refusals": 12,
+    "process_calls": 0,
+    "USB_calls": 0,
+    "scope": "local refusal controls; no runtime ownership or recovery proof"
+  },
+  "storage_profile": {
+    "valid": 1,
+    "refusals": 16,
+    "device_calls": 0,
+    "scope": "offline consistency only; no hardware or boot qualification"
+  },
+  "actual_archived_GPT_selector_check": "PASS actual GPT selector, 56 identity corruptions, duplicate/missing, Data and CDB fences",
+  "format2_record_check": "13 areas; pending change path ownership checked against original main baseline",
+  "pending_code_parse_and_local_link_checks": true,
+  "binary_and_credential_signature_scan": "no matches in pending files",
+  "device_operations": false,
+  "new_native_kernel_or_FD_build": false,
+  "old_device_runs_relabelled": false,
+  "GitHub_CI_claimed": false,
+  "limits": [
+    "Host checks cover these software/file guards; not GPU execution, a live lease, device recovery or complete format2 native qualification.",
+    "External firmware/SDK/source dependencies remain local/pinned; historical raw artifacts are not distributed."
+  ]
+}
