@@ -185,6 +185,10 @@ def edk2_fat32(image: bytes):
 def main():
     parser = argparse.ArgumentParser(description="Pack the ZORNESP FAT volume. Does not flash.")
     parser.add_argument('--data-profile',choices=('512m','8g'),default='512m')
+    parser.add_argument('--storage-profile', type=Path,
+                        help='explicit dedicated unixnu storage descriptor; requires its compiled-kernel proof')
+    parser.add_argument('--storage-build-proof', type=Path,
+                        help='bind --kernel to the selected storage descriptor; grants no boot permission')
     parser.add_argument('--fresh-data',action='store_true',help='explicit initial boot of a new8GiBData store')
     parser.add_argument("--smp-preflight",type=int,choices=(0,8),default=0,
                         help="eight-core pre-root qualification, no Data publication")
@@ -240,7 +244,20 @@ def main():
                         help="opt-in UEFI Gunyah watchdog; requires host-verified recovery BCB (2 deliberately stops UEFI)")
     parser.add_argument("--trust-cache", type=Path, help="unchanged original 21H461 static+System bundle")
     parser.add_argument("-o", "--output", type=Path, default=REPO / "out/zorn/payload.img")
+    parser.add_argument("--gpu-owned-memory-preflight", action="store_true", help="CPU-only fixed stock-SHA Gen7 backing qualification; no GPU activation")
+    parser.add_argument("--os-profile", type=Path, default=REPO / "UniXNU/profiles/os/ipados-17.7.11-21H461/profile.toml")
+    parser.add_argument("--cpu-profile-proof", type=Path, default=REPO / "out/zorn/cpu-profile/profile.json")
     args = parser.parse_args()
+    storage_selection = None
+    if bool(args.storage_profile) != bool(args.storage_build_proof):
+        parser.error('--storage-profile and --storage-build-proof must be supplied together')
+    if args.storage_profile:
+        from zorn_storage_profile import validate
+        try:
+            storage_selection = validate(args.storage_profile, args.storage_build_proof,
+                                         args.kernel, args.data_profile, args.data_store_mode)
+        except (OSError, ValueError, KeyError) as error:
+            parser.error(str(error))
     if args.display_progress and (not (args.smp_preflight == 8 and args.smp_continue and
         args.smp_root_publication == 1 and not args.smp_stop_after_pass and args.gui_watch and
         args.touch_trace and args.touch_runtime and args.retained_data and not args.fresh_data and
@@ -254,6 +271,16 @@ def main():
         args.gui_hold_seconds==300 and args.display_mode==3 and args.brightness_mode==3 and args.data_store_mode==2) or
         args.gui_user_stacks or args.gui_kernel_stacks or args.gui_runnable_kernel_stacks):
         parser.error('CPU active observation requires retained8GiB eight-core300s dim64/trace/progress/watchdog1; no stop or stacks')
+    if args.gpu_owned_memory_preflight and (not (args.smp_preflight==8 and args.smp_continue and
+        args.smp_root_publication==1 and not args.smp_stop_after_pass and args.gui_watch and
+        args.touch_trace and args.touch_runtime and args.touch_edges and args.touch_kernel_parser and
+        args.touch_fast_poll and args.touch_handoff and args.hid_family and
+        args.retained_data and not args.fresh_data and args.data_profile=='8g' and args.memory_mib==8192 and
+        args.early_watchdog==1 and args.gui_hold_seconds==300 and args.display_mode==3 and
+        args.brightness_mode==3 and args.data_store_mode==2) or
+        args.cpu_active_observation or args.display_progress or args.gui_user_stacks or
+        args.gui_kernel_stacks or args.gui_runnable_kernel_stacks ):
+        parser.error('GPU owned memory requires a new pinned8core/8GiB retained dim64 touch/trace300/600 watchdog1 profile; no boot/reuse/stop/stacks/CPU-active/display-progress')
     if args.smp_root_publication and args.smp_preflight!=8:
         parser.error("root publication requires eight-core preflight")
     if args.smp_stop_after_pass and not args.smp_continue:
@@ -347,8 +374,8 @@ def main():
     cpu_fixups = None
     if args.display_mode == 3:
         import json
-        profile = REPO / "UniXNU/profiles/os/ipados-17.7.11-21H461/profile.toml"
-        proof = json.loads((REPO / "out/zorn/cpu-profile/profile.json").read_text())
+        profile = args.os_profile
+        proof = json.loads(args.cpu_profile_proof.read_text())
         cpu_fixups = tomllib.loads(profile.read_text())["payload"]["text_fixups"][:3]
         if proof["profile_sha256"] != hashlib.sha256(profile.read_bytes()).hexdigest() or \
                 [c["entry"] for c in proof["checks"]] != cpu_fixups or \
@@ -404,7 +431,7 @@ def main():
                     prefixes = ("offline-mobile-graphics-load=", "offline-legacy-register=", "offline-legacy-gop=",
                                 "offline-legacy-phase=", "zorn_display=", "zorn_exec_budget=",
                                 "offline-legacy-pm=", "offline-legacy-validate=", "offline-legacy-transfer=",
-                                "offline-legacy-cpu-present=", "sheng-vsync=", "wfi=", "armcpu-diagnostics=", "zorn_gui_watch=", "zorn_display_progress=", "zorn_cpu_active=", "zorn_gui_hold=",
+                                "offline-legacy-cpu-present=", "sheng-vsync=", "wfi=", "armcpu-diagnostics=", "zorn_gui_watch=", "zorn_display_progress=", "zorn_cpu_active=", "zorn_gpu_owned_memory=", "zorn_gui_hold=",
                                 "offline-key-events=", "sheng-aks=", "zorn_data_store=", "zorn_data_retained=", "zorn_brightness=", "zorn_touch=", "zorn_touch_edges=", "zorn_touch_kernel_parser=", "zorn_touch_trace=", "zorn_touch_fast=", "zorn_gui_quiet=", "zorn_hid_family=", "zorn_gui_stack=", "zorn_gui_kstack=", "zorn_gui_krun=", "zorn_gui_service=", "zorn_gui_service_thread=", "zorn_gui_backboard_thread=",
                                 "sheng-disable-jobs=", "sheng-disable-watchdogd=", "sheng-lite=", "zorn_data_permissions=")
                     tokens = [t for t in tokens if not t.startswith(prefixes)]
@@ -439,6 +466,8 @@ def main():
                             tokens.append("zorn_display_progress=1")
                         if args.cpu_active_observation:
                             tokens.append("zorn_cpu_active=1")
+                        if args.gpu_owned_memory_preflight:
+                            tokens.append("zorn_gpu_owned_memory=1")
                         if args.gui_user_stacks:
                             tokens.append("zorn_gui_stack=1")
                         if args.gui_kernel_stacks:
@@ -561,6 +590,9 @@ def main():
         sys.exit("unexpected restore ramdisk in the UFS-only payload")
     if args.trust_cache and "kernel.macho.trustcache" not in listing:
         sys.exit("payload is missing trust cache sidecar")
+    if storage_selection is not None:
+        import json
+        out.with_suffix('.storage.json').write_text(json.dumps(storage_selection, indent=2) + '\n')
     print(listing)
     print(f"wrote {out} ({len(data)} bytes)")
 
