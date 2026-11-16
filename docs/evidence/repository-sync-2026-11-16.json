@@ -1,0 +1,27 @@
+{
+  "scope": "Repository synchronization only;no firmware build or device operation",
+  "corrected_historical_receipts": [
+    {
+      "path": "docs/evidence/data-retained-repeat-result.json",
+      "source": "UniXNU-zorn/docs/evidence/data-retained-repeat-result.json",
+      "source_sha256": "45fa168927958936293ececef00d2c19d426ac6667ffc66f96a910f85d6b18ee",
+      "previous_wrong_content_sha256": "6290d1ddfd2f74922f47168faf50bb1ec081bd4fa530d56b6a41209428fdc11a",
+      "reason": "Historical file contained a README snapshot instead of the named JSON receipt;copied authoritative same-name evidence byte-for-byte",
+      "historical_run": "out/zorn/debug/20261028-214203-ece3d0e8"
+    },
+    {
+      "path": "docs/evidence/touch-cooperative-result.json",
+      "source": "UniXNU-zorn/docs/evidence/touch-cooperative-result.json",
+      "source_sha256": "b9b0cda8a03157414db285e4a2b75ae0b3ce6a3b29bd9275a389a17fd9bee23f",
+      "previous_wrong_content_sha256": "3b472c38960b656ecbb3ed840077ec5b73ecba072b03a8873c46ab87ab2020df",
+      "reason": "Historical file contained a README snapshot instead of the named JSON receipt;copied authoritative same-name evidence byte-for-byte",
+      "historical_run": "out/zorn/debug/20261028-221953-d2c17be2"
+    }
+  ],
+  "checkpoint_source_pins_matching": 13,
+  "historical_checkpoint_receipt": "docs/evidence/gpu-unixnu64-checkpoint-2026-11-01.json",
+  "latest_device_record": "https://github.com/kerrinz/UniXNU-zorn/blob/0ca7f702e30a277371975feef665ec5763f4a43b/docs/evidence/k80-gpu-v247-known-present-observed-2026-11-16.json",
+  "no_historical_run_reassigned_current_commit": true,
+  "device_record_publication_commit": "0ca7f702e30a277371975feef665ec5763f4a43b",
+  "publication_revision_scope": "Version of the published source/record snapshot;not a reassigned historical hardware build revision"
+}

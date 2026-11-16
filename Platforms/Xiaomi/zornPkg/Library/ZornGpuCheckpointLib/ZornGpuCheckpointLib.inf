@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+# Deliberately unselected: no DSC/FDF entry or automatic native invocation.
+[Defines]
+  INF_VERSION = 0x00010005
+  BASE_NAME = ZornGpuCheckpointLib
+  FILE_GUID = C52B801B-BA6A-41D6-BDE6-F5D49CD9D182
+  MODULE_TYPE = BASE
+  VERSION_STRING = 1.0
+  LIBRARY_CLASS = NULL
+
+[Sources]
+  ZornCheckpointIdentity.c
+  ZornCheckpointReadOnly.cpp
+  ZornCheckpointBootLifetime.cpp
+  ZornCheckpointDiscovery.cpp
+  ZornCheckpointIdentity.h
+  ZornCheckpointReadOnly.h
+  ZornCheckpointBootLifetime.h
+  ZornCheckpointDiscovery.h
+  ZornCheckpointStoragePins.h
+  ZornCheckpointUfsPathPins.h
+
+[Packages]
+  MdePkg/MdePkg.dec
+
+[LibraryClasses]
+  BaseMemoryLib

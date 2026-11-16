@@ -19,7 +19,7 @@ def sha(path):
 
 
 def build(root, uefi, stage='gpu-canonical-firmware'):
-    if stage not in ('gpu-canonical-firmware', 'gpu-canonical-checkpoint', 'gpu-terminal-collector', 'gpu-terminal-commit-integration', 'gpu-media-qualification-candidate'):
+    if stage not in ('gpu-canonical-firmware', 'gpu-canonical-checkpoint', 'gpu-terminal-collector', 'gpu-terminal-commit-integration', 'gpu-media-qualification-candidate', 'gpu-unixnu64-closed-firmware', 'gpu-unixnu64-media-candidate', 'gpu-resource-query-checkpoint-20261101', 'gpu-resource-observation-candidate'):
         raise SystemExit('Unknown isolated firmware stage')
     out = root / 'out/zorn' / stage
     receipt = json.loads((out / 'source-provenance.json').read_text())
@@ -47,6 +47,69 @@ def build(root, uefi, stage='gpu-canonical-firmware'):
         raise SystemExit('A device run is active')
     if stage == 'gpu-media-qualification-candidate' and current.get('active_build') != 'offline-approved-media-qualification-candidate-FD':
         raise SystemExit('Media candidate requires its exclusive recorded build phase')
+    if stage == 'gpu-unixnu64-closed-firmware':
+        if current.get('active_build') != 'offline-unixnu64-closed-checkpoint-FD':
+            raise SystemExit('unixnu64 checkpoint requires its exclusive build phase')
+        if receipt.get('storage_profile') != 'unixnu64' or receipt.get('storage_invocation_allowed') is not False:
+            raise SystemExit('unixnu64 source receipt must keep storage invocation OFF')
+        inf = (out / 'Packages/zornPkg/Drivers/ZornBootMemoryDxe/ZornBootMemoryDxe.inf').read_text()
+        for macro in ('ZEF_NATIVE_COMMIT_INSPECTION', 'ZEF_MEDIA_QUALIFICATION_COMMIT',
+                      'ZMQ_QUALIFICATION_CALLER', 'ZMQ_QUALIFICATION_DRIVER'):
+            if inf.count('-D'+macro+'=0') != 1 or '-D'+macro+'=1' in inf:
+                raise SystemExit('Native diagnostic macro must remain zero: '+macro)
+    if stage == 'gpu-resource-query-checkpoint-20261101':
+        if (current.get('active_build') != 'offline-resource-query-checkpoint-closed-FD' or
+                receipt.get('resource_query_flag') != 0 or
+                receipt.get('storage_invocation_allowed') is not False):
+            raise SystemExit('Closed resource-query source build phase required')
+        inf = (out / 'Packages/zornPkg/Drivers/ZornBootMemoryDxe/ZornBootMemoryDxe.inf').read_text()
+        for macro in ('ZEF_NATIVE_COMMIT_INSPECTION', 'ZEF_MEDIA_QUALIFICATION_COMMIT',
+                      'ZMQ_QUALIFICATION_CALLER', 'ZMQ_QUALIFICATION_DRIVER', 'ZMQ_RESOURCE_QUERY'):
+            if inf.count('-D'+macro+'=0') != 1 or '-D'+macro+'=1' in inf:
+                raise SystemExit('All resource/storage native selectors must remain0: '+macro)
+    if stage == 'gpu-unixnu64-media-candidate':
+        if current.get('active_build') != 'offline-unixnu64-native-media-candidate-FD':
+            raise SystemExit('unixnu64 media candidate requires its exclusive offline build phase')
+        approval = out / 'offline-policy.json'
+        if sha(approval) != receipt['offline_policy_sha256']:
+            raise SystemExit('Offline diagnostic policy receipt changed')
+        policy = json.loads(approval.read_text())
+        if (policy.get('storage_profile') != 'unixnu64' or
+                policy.get('terminal_before_payload') is not True or
+                policy.get('native_activation_approved') is not False or
+                sha(policy['prior_approval']) != policy['prior_approval_sha256'] or
+                receipt.get('storage_invocation_allowed') is not False):
+            raise SystemExit('New offline candidate does not grant device invocation')
+        prior = json.loads(Path(policy['prior_approval']).read_text())
+        if (prior.get('approved_diagnostic_policy') is not True or
+                prior.get('preowner_and_nonreturning_IO_unavailable_accepted') is not True):
+            raise SystemExit('Approved terminal policy required')
+        inf = (out / 'Packages/zornPkg/Drivers/ZornBootMemoryDxe/ZornBootMemoryDxe.inf').read_text()
+        for macro, value in [('ZEF_NATIVE_COMMIT_INSPECTION', 0),
+                             ('ZEF_MEDIA_QUALIFICATION_COMMIT', 1),
+                             ('ZMQ_QUALIFICATION_CALLER', 1), ('ZMQ_QUALIFICATION_DRIVER', 1)]:
+            if inf.count('-D'+macro+'='+str(value)) != 1:
+                raise SystemExit('Exact dedicated diagnostic selection required: '+macro)
+    if stage == 'gpu-resource-observation-candidate':
+        if (current.get('active_build') != 'offline-selected-resource-observation-candidate-FD' or
+                receipt.get('resource_query_compiled') is not True or
+                receipt.get('storage_invocation_allowed') is not False):
+            raise SystemExit('Exclusive offline resource candidate phase required')
+        path = out / 'offline-policy.json'
+        if sha(path) != receipt['offline_policy_sha256']:
+            raise SystemExit('Resource candidate policy changed')
+        policy = json.loads(path.read_text())
+        if (policy.get('native_activation_approved') is not False or
+                policy.get('resource_observation_only') is not True or
+                policy.get('no_SCM_PAS_MMIO_GPU') is not True or
+                policy.get('terminal_before_payload') is not True or
+                sha(policy['prior_policy']) != policy['prior_policy_sha256']):
+            raise SystemExit('Offline resource-only policy required')
+        inf = (out / 'Packages/zornPkg/Drivers/ZornBootMemoryDxe/ZornBootMemoryDxe.inf').read_text()
+        for macro,value in [('ZEF_NATIVE_COMMIT_INSPECTION',0),('ZEF_MEDIA_QUALIFICATION_COMMIT',1),
+                            ('ZMQ_QUALIFICATION_CALLER',1),('ZMQ_QUALIFICATION_DRIVER',1),('ZMQ_RESOURCE_QUERY',1)]:
+            if inf.count('-D'+macro+'='+str(value)) != 1:
+                raise SystemExit('Exact dedicated query selector required: '+macro)
     edk2 = root / 'UniXNU/out/feeds/mu_basecore-89034cbb'
     tools = edk2 / 'BaseTools'
     if not (tools / 'Source/C/bin/GenFw').is_file():

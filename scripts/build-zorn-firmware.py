@@ -16,16 +16,20 @@ parser.add_argument("--gpu-checkpoint-prepare", action="store_true", help="build
 parser.add_argument("--gpu-terminal-collector", action="store_true", help="build the approved offline terminal-record collector FD; storage/GPU invocation stays OFF")
 parser.add_argument("--gpu-terminal-commit", action="store_true", help="build the isolated terminal commit join; native body compile0/caller FALSE, no I/O/boot")
 parser.add_argument("--gpu-media-qualification-candidate", action="store_true", help="build approved terminal media diagnostic candidate offline; no device I/O or boot")
+parser.add_argument("--gpu-unixnu64-checkpoint", action="store_true", help="build the isolated unixnu64 checkpoint FD with every native diagnostic caller OFF")
+parser.add_argument("--gpu-unixnu64-media-candidate", action="store_true", help="build the dedicated unixnu64 terminal media candidate offline; no device execution")
+parser.add_argument("--gpu-resource-query-checkpoint", action="store_true", help="build the default-OFF resource query/checkpoint source join; no device execution")
+parser.add_argument("--gpu-resource-observation-candidate", action="store_true", help="build the isolated selected resource observation candidate offline; no device execution")
 parser.add_argument("--record-existing", action="store_true", help="record a just-completed build, after checking output timestamps")
 args = parser.parse_args()
 args.uefi = args.uefi.resolve()
-if args.gpu_platform_prepare or args.gpu_checkpoint_prepare or args.gpu_terminal_collector or args.gpu_terminal_commit or args.gpu_media_qualification_candidate:
-    if sum((args.gpu_platform_prepare, args.gpu_checkpoint_prepare, args.gpu_terminal_collector, args.gpu_terminal_commit, args.gpu_media_qualification_candidate)) != 1:
+if args.gpu_platform_prepare or args.gpu_checkpoint_prepare or args.gpu_terminal_collector or args.gpu_terminal_commit or args.gpu_media_qualification_candidate or args.gpu_unixnu64_checkpoint or args.gpu_unixnu64_media_candidate or args.gpu_resource_query_checkpoint or args.gpu_resource_observation_candidate:
+    if sum((args.gpu_platform_prepare, args.gpu_checkpoint_prepare, args.gpu_terminal_collector, args.gpu_terminal_commit, args.gpu_media_qualification_candidate, args.gpu_unixnu64_checkpoint, args.gpu_unixnu64_media_candidate, args.gpu_resource_query_checkpoint, args.gpu_resource_observation_candidate)) != 1:
         parser.error("Select one isolated firmware stage")
     if args.record_existing:
         parser.error("GPU preparation must build its own outputs")
     from zorn_gpu_firmware import build
-    build(ROOT, args.uefi, 'gpu-media-qualification-candidate' if args.gpu_media_qualification_candidate else 'gpu-terminal-commit-integration' if args.gpu_terminal_commit else ('gpu-terminal-collector' if args.gpu_terminal_collector else ('gpu-canonical-checkpoint' if args.gpu_checkpoint_prepare else 'gpu-canonical-firmware')))
+    build(ROOT, args.uefi, 'gpu-resource-observation-candidate' if args.gpu_resource_observation_candidate else 'gpu-resource-query-checkpoint-20261101' if args.gpu_resource_query_checkpoint else 'gpu-unixnu64-media-candidate' if args.gpu_unixnu64_media_candidate else 'gpu-unixnu64-closed-firmware' if args.gpu_unixnu64_checkpoint else 'gpu-media-qualification-candidate' if args.gpu_media_qualification_candidate else 'gpu-terminal-commit-integration' if args.gpu_terminal_commit else ('gpu-terminal-collector' if args.gpu_terminal_collector else ('gpu-canonical-checkpoint' if args.gpu_checkpoint_prepare else 'gpu-canonical-firmware')))
     raise SystemExit(0)
 subprocess.run(["python3", str(ROOT / "uefi-zorn/scripts/check-zorn-touch-power.py")], check=True)
 if not args.record_existing:

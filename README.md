@@ -8,6 +8,8 @@ This repository owns the K80 firmware board package, BootShim, menu template and
 
 Official format-2 device documentation is generated from that device repository's root `board.toml` and `porting.toml`; this firmware repository does not publish a duplicate whole-device record. See the [publication guide](https://unixnu.com/zh/porting/records#publishing-and-reuse).
 
+As of2026-11-16,v247 records the GPU-verified IOSurface entering the real display queue with a matching frame/SID,fence,acquire and CPU copy. One protected run returned toTWRP in332.500seconds. It reused the pinned FD and launcher;this update does not claim a new firmware build. Physical known-image output,full GPU desktop,FT3683 gestures and stability remain unqualified;raw diagnostic loss36 keeps strict application incomplete. See [current progress and build scope](docs/progress-2026-11-16-ios26.md).
+
 ## State
 
 As of 2026-10-30, the combined port has owner-confirmed desktop and basic single-touch interaction, eight-core checks, retained 8 GiB Data, an 8 GiB XNU window and brightness 64. The CPU1 narrow root-publication fix has same-kernel controls and two-layout evidence. A later Apple-logo GUI failure remains unresolved; the final `c50ca7ea` observation showed a lock screen and all-core accounting progress, then recovered automatically. It does not qualify performance, system multi-touch or long-term stability.
@@ -64,6 +66,6 @@ New files use [BSD-2-Clause-Patent](LICENSE); upstream files retain their notice
 
 ## GPU scope
 
-GPU-owned memory preparation and its closed diagnostic helpers are published as implemented source. Hardware GPU execution, rendering and Metal remain unqualified. Detailed research summaries are retained in [GPU progress](docs/progress-2026-10-30-gpu.md); many isolated capsules and large logs are local archives, not a runnable production driver. Historical input counts describe their own frozen runs.
+GPU-owned memory preparation and its closed diagnostic helpers are published as implemented source. The v247 fixed probe has bounded same-surface queue/acquire/copy and native-close evidence;physical known-image output,complete GPU desktop and long-term behavior remain unqualified. Detailed research summaries are retained in [GPU progress](docs/progress-2026-10-30-gpu.md); many isolated capsules and large logs are local archives, not a runnable production driver. Historical input counts describe their own frozen runs.
 
 The current stock-reflash/unixnu64 installation and owner-confirmed retained Data/touch are documented in [storage-unixnu64](docs/storage-unixnu64.md). Old userdata/slotB images must not be booted on that layout.

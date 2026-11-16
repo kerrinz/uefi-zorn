@@ -1,0 +1,2 @@
+# Preserve exact archived source bytes used by the existing lifetime evidence.
+Platforms/Xiaomi/zornPkg/Library/ZornGpuCheckpointLib/ZornCheckpointBootLifetime.cpp -whitespace

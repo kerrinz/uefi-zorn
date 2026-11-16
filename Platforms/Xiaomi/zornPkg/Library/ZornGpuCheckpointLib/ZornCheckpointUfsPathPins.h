@@ -1,0 +1,4 @@
+/* Exact archived UFSDxe LU0 table entry, not a live handle/token. */
+#pragma once
+#include <Uefi.h>
+static CONST EFI_GUID ZcpExpectedUfsLu0Guid={0x860845c1,0xbe09,0x4355,{0x8b,0xc1,0x30,0xd6,0x4f,0xf8,0xe6,0x3a}};
