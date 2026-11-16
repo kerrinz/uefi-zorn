@@ -1,5 +1,8 @@
 # K80 firmware and iOS26 progress — 2026-11-16
 
+Current update: [2026-11-17 v261 observation and catalog ingestion fix](progress-2026-11-17-ios26.md). The v247 history below retains its original exact inputs and limits.
+
+
 The matching device repository records v247's bounded same-IOSurface presentation path. The signed probe verified its Metal pixels,then submitted that surface through the existing display queue. Kernel frame499/SID35/access fence4,real acquire and copy counter497→498 were captured. Two native GPU sessions closed successfully. One protected run returned automatically toTWRP in332.500seconds;the later camera frame shows the lockscreen.
 
 The exact kernel isbbe690d0446df7046feda16f604578a5638efaa95a180c3880c6e71169811653;boot1af1d05edb9c19a341cb66eebbc5896584c7690088e8f56305f5c27313f6aeb2. It reused FD1bf94507996700b508474956f5d7f96fa7df764201951b0ce8e5ce8b592a11ab and the retained launcher;ADTdd49b399eef62380cd1eebdf02db18ef616debfd5e4f1ee01b47e141b17cf420 binds rootdde0082d112afdaa07d46ef15e1b38ca9d6072ed4c0b1d71a578c8b6e3ce6f9e. A separate fixed Recovery-only installation changed63 pages in the independently reviewed existing iOS26 root window and read each group back. Android,17/Data,GPT and boot partitions were not written. This was not a new UEFI build or firmware installation.

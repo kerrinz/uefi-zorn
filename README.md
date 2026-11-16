@@ -10,6 +10,8 @@ Official format-2 device documentation is generated from that device repository'
 
 As of2026-11-16,v247 records the GPU-verified IOSurface entering the real display queue with a matching frame/SID,fence,acquire and CPU copy. One protected run returned toTWRP in332.500seconds. It reused the pinned FD and launcher;this update does not claim a new firmware build. Physical known-image output,full GPU desktop,FT3683 gestures and stability remain unqualified;raw diagnostic loss36 keeps strict application incomplete. See [current progress and build scope](docs/progress-2026-11-16-ios26.md).
 
+As of2026-11-17,the companion v261 trial reached the owner-confirmed iOS desktop and basic gestures,then froze on Settings long press. Both render paths are low frame rate;GPU stability remains unresolved. One protected boot recovered toTWRP333.63s with successful CDC and camera capture. The existing FD/launcher were reused;no new firmware build. Device catalog EOF ingestion repair and exact results are recorded in [current progress](docs/progress-2026-11-17-ios26.md).
+
 ## State
 
 As of 2026-10-30, the combined port has owner-confirmed desktop and basic single-touch interaction, eight-core checks, retained 8 GiB Data, an 8 GiB XNU window and brightness 64. The CPU1 narrow root-publication fix has same-kernel controls and two-layout evidence. A later Apple-logo GUI failure remains unresolved; the final `c50ca7ea` observation showed a lock screen and all-core accounting progress, then recovered automatically. It does not qualify performance, system multi-touch or long-term stability.

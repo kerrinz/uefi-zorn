@@ -1,0 +1,43 @@
+{
+  "version": 261,
+  "date": "2026-11-17",
+  "scope": "Companion K80 iOS26 trial reused exact existing firmware and launcher;no new UEFI build",
+  "companion_source": {
+    "path": "/Volumes/macData/projects/ios-zorn/UniXNU-zorn/docs/evidence/k80-gpu-v261-client-failure-observed-2026-11-17.json",
+    "sha256": "ac95285de7369e96414fc801554ed31c5b73003e8e7306dc0988458003d8a730"
+  },
+  "kernel_sha256": "fd74f710a949b40d1f7076e534d2836106aa140bf45e7365fecf718a9c4de90f",
+  "boot_sha256": "0e2b7278b8d5cd54121f11add6a71cf02628d1411620f9e404d2a32b950b7596",
+  "FD_sha256": "1bf94507996700b508474956f5d7f96fa7df764201951b0ce8e5ce8b592a11ab",
+  "ADT_sha256": "98f04ff54b9573ddaa2c4716da0e954fae8192d15b1f105426eba7f216805936",
+  "root_sha256": "859c7ebae6355ef7e089896680b0b8ffd9a03af8a1f078918feec740b7a06b02",
+  "boot_attempts": 1,
+  "retries": 0,
+  "recovery_seconds": 333.62836049997713,
+  "recovery": "TWRP",
+  "protected_samples_equal": true,
+  "BCB_full_readback_and_tail_preserved": true,
+  "camera_video_available": true,
+  "owner_feedback": {
+    "source": "Current conversation owner observation and subsequent corrections",
+    "interface": "iOS lock screen and desktop",
+    "responsive_actions": [
+      "swipe",
+      "tap",
+      "long press",
+      "unlock"
+    ],
+    "failure": "Eventually froze after long pressing Settings icon",
+    "frame_rate": "Both GPU and pure CPU paths are low frame rate;no comparative frame-rate ranking or measured FPS claimed",
+    "stability": "Owner reports GPU path is less stable",
+    "complete_contact_identity_edges_and_lifecycle_qualified": false,
+    "precise_action_timestamp_unknown": true
+  },
+  "mapping_diagnostic": "First recorded backend error method3 BoMap NoResources;inner branch and final freeze cause unresolved",
+  "source_grade_only": true,
+  "full_GPU_qualification": false,
+  "FT3683_full_acceptance": false,
+  "new_firmware_build": false,
+  "new_phone_action_in_repository_sync": false,
+  "no_commit_or_push": true
+}
