@@ -1,66 +1,28 @@
-# K80 固件构建与交接
+# K80 iOS 26 固件构建与交接
 
-> 当前设备已改为slotA + Android +独立unixnu64。先阅读[新存储布局](storage-unixnu64.md)。下文slotB/userdata/192GiB命令属于历史配置；不可用于当前设备，尤其不可执行generic输出的flash userdata。历史兼容board及资格清单原样保留。
+iOS 26.6.2（23G90）候选绑定精确 FD、DarwinBoot、菜单、ADT、内核和根镜像。设备仓库维护当前组合及实机证据。 [iOS 26 主线](https://github.com/kerrinz/UniXNU-zorn/blob/main/docs/ios26-mainline.md)
 
-本文记录显式保留的格式 1 调试入口；设备根配置已迁移格式 2，但固件构建器显式选择固定兼容配置；整机结构化记录维护于相邻的 `UniXNU-zorn/porting.toml`。本次整理不重新构建、不启动手机、不改变现有归档。
+## 板级包与构建
 
-## 板级包与上游
+`uefi-zorn` 提供 K80 的 DSC／FDF、内存图、BootShim、启动服务、触控供电交接和封装工具。构建使用匹配的 Mu-Silicium 检出及 Common／Silicon／ACPI、EDK II、giulia SM8650 DXE 和 UniXNU 组件。
 
-`uefi-zorn` 只包含 K80 板级包，不是 Mu-Silicium 的完整 fork。`stage-into-mu.sh /path/to/Mu-Silicium` 将平台和配置链接进已有检出，不复制固件，不创建额外 Git 仓库。这些本机链接不要提交到 Mu-Silicium。
-
-依赖包括 Mu-Silicium 的 Common / Silicon / ACPI、EDK II、匹配的 UniXNU / DarwinBoot 组件和现有 giulia SM8650 DXE 二进制输入。DSC 为 `Platforms/Xiaomi/zornPkg/zorn.dsc`，对应 FDF 与内存图必须一起使用。厂商及 Apple 输入按原来源准备，不随本仓库发布。
-
-## 固件构建
-
-从共同父目录执行：
+在独立工作区放置 `uefi-zorn`、`UniXNU-zorn`、`UniXNU` 和 `Mu-Silicium`。准备好的 Mu-Silicium 检出基于 `42fe563791e51bf5500c2e470ed294ca0c94b97c`，叠加 K80 所需的 DSC 调整并保留 giulia DXE 等依赖。固件构建还需要兼容视图锁定的 EDK II `cfb93724a06ff86ff5ba971413368a7809ee42a5`、匹配的 UniXNU／DarwinBoot 源码和 CLANGPDB 工具链。历史检出的本地调整和组件来源以对应 FD 清单为准。
 
 ```sh
-sh uefi-zorn/scripts/stage-into-mu.sh /path/to/Mu-Silicium
+mu="$PWD/Mu-Silicium"
+sh uefi-zorn/scripts/stage-into-mu.sh "$mu"
+python3 -B uefi-zorn/scripts/build-zorn-firmware.py --uefi "$mu" \
+  --out "$PWD/out/zorn/firmware-review"
 ```
 
-在 UniXNU 目录选择设备后，回到共同父目录使用固件入口：
+构建器按固定兼容视图解析板级参数，检查唯一的 AArch64 `ZornBootMemoryDxe` 与 3 MiB FD，并将 `firmware.inputs.json` 写入 `--out` 指定目录。iOS 26 的每个候选绑定自己的 FD 和加载器。v371 重封装使用原 v371 归档中 SHA-256 为 `1bf94507996700b508474956f5d7f96fa7df764201951b0ce8e5ce8b592a11ab` 的 FD，配方及构建记录见设备仓库。[UniXNU 固件集成指南](https://unixnu.com/zh/porting/uefi-firmware) · [v371 构建记录](https://github.com/kerrinz/UniXNU-zorn/blob/main/docs/evidence/k80-ft3683-v371-early-smmu-cdc-offline-2026-11-19.json)
 
-```sh
-# 在 UniXNU 目录执行
-python3 ../UniXNU-zorn/scripts/prepare-zorn-legacy-view.py
-./unixnu defconfig zorn_defconfig -D ../out/zorn/legacy-device
-```
+## 负载与交接
 
-```sh
-# 在共同父目录执行
-python3 uefi-zorn/scripts/build-zorn-firmware.py --uefi /path/to/Mu-Silicium
-```
+FD 基址为 `0xA7100000`，大小 `0x300000`。BootShim 解压窗口为 `0xA8000000`–`0xB8000000`，负载邮箱为 `0xA7601000`。固定封装使用 Android boot header v4、gzip 及 FAT32 载体。菜单路径为 `EFI/UniXNU/unixnu.toml`，由 DarwinBoot 加载精确候选的内核和 ADT。
 
-构建器核对 AArch64 PE 模块、源码与输出时间、唯一的 ZornBootMemoryDxe，以及 3 MiB FD。清单保存到共同父目录的 `out/zorn/firmware.inputs.json`，并保留按哈希命名的 FD 副本。清单里的 capability 不替代真实设备结果，真机范围仍以绑定运行日志的证据为准。
+K80 封装把 FAT 追加在 FD 后，再一起压入 Android boot 镜像的 kernel 字段。BootShim 把 FAT 的地址和长度写入邮箱，`ZornBootMemoryDxe` 检查范围和 ZORNESP 标记后发布只读 Block I/O，再由 DiskIoDxe 和 FAT DXE 发布文件系统。设备树仍可用于发现 DRAM 和提供备用 initrd。固件卷由板级 DXE 接管该职责，与官方 `UniXNURamDiskDxe` 的 FDT initrd 集成方式不同。[BootShim](../BootShim/BootShim.S) · [板级 DXE](../Platforms/Xiaomi/zornPkg/Drivers/ZornBootMemoryDxe/ZornBootMemoryDxe.c)
 
-主 UniXNU 的本地 CLI overlay、完整内核依赖及干净补丁重放限制见相邻设备仓库的 `docs/build-and-debug.md`。仅重建 FD 不代表已经生成完整可用的桌面镜像。
+固件记录保持 GOP、PSCI 和触控供电交接来源。使用有界回收时，提前 watchdog 由候选 FAT 中 `0x180` 的 `ZORNGHWD` marker 显式选择。设备 runner 只操作 `92988a43`／`zorn`／slot A，先核验 Recovery、保护区和 BCB 整页再执行。 [当前存储与回收边界](storage-unixnu64.md)
 
-## 负载与镜像
-
-当前实际启动负载为 192 MiB FAT32，簇大小 512 字节，包含菜单、内核、派生 ADT、原版 trust cache 及配置要求的 PackedRAMDisk。打包器清除 mtools 写入的伪分区表，并检查 DarwinBoot sidecar 声明，避免出现菜单找不到或 ADT 残留占位。
-
-原版 trust cache bundle SHA256：`7416ca4f8377146626bb284e2133c76bee6cb4e3ee0af5d648b186235a7323a7`。Data 配置需要合法 PackedRAMDisk；不能把早期只读基线的 `--no-initrd` 命令直接套到当前 8 GiB 持久 Data 配置。
-
-完整参数由 `UniXNU-zorn/scripts/build-zorn-debug.py` 生成；当前桌面触控组合包含八核、8 GiB 内存、保留 Data、低亮度、触控供电、原版 HID 解析和快采样，见设备仓库 `docs/build-and-debug.md`。单独调用低层 `make-zorn-payload.py` / `package-zorn-boot.py` 不会自动生成统一 ready 清单，不能冒充完整调试构建结果。
-
-启动镜像使用 Android header v4 和 gzip；不带 Android ramdisk、不追加 DTB。小米 ABL 使用现有 vendor_boot 的设备树，本打包器不修改该分区。`dts/zorn-splash.dts` 仅供对照。
-
-BootShim、FD 与 FAT 解压后须适合 `0xA8000000`–`0xB8000000` 的 256 MiB 窗口。XNU 的 8 GiB 窗口从真实 UEFI ConventionalMemory 另行分配；不能将两者或标称 12 GiB 内存混为一谈。
-
-## 交接与自动回收
-
-`ZornBootMemoryDxe` 扫描可用 WB 内存中的 FAT 负载，复制至 BootServicesData 并发布文件系统。负载菜单为 `EFI/UniXNU/unixnu.toml`，倒计时 5 秒，由 DarwinBoot 交接内核。
-
-提前 watchdog 只在 FAT 引导代码区 `0x180` 出现显式 `ZORNGHWD` marker 时启用，普通负载不隐式启用。模式 1 在 UEFI 配置 Gunyah bark / bite，内核接管后由受限日志与观察策略继续控制；模式 2 是 UEFI 停 CPU 的独立测试，不是正常启动模式。已有自动回 recovery 及内核 `WON` 证据，具体复位源和精确超时尚未独立测定。
-
-提前 watchdog 镜像须由固定设备 runner 先准备并读回 recovery BCB。唯一目标 `92988a43` / `zorn` / 槽位 `b`；`f85d4270` 为 CC9，禁止操作。只执行临时 `fastboot boot`；OS / SystemOS 只读，Data、单页日志和 misc BCB 的授权边界由设备仓库维护。禁止启动 Android、flash / erase、改槽或改 GPT。
-
-## 当前验收范围
-
-`42f3d518` 的完整身份见 [桌面触控证据](evidence/touch-desktop-fast-qualified.json)：机主确认进入桌面及单指基本交互，八核检查、保留 Data 标志和亮度读回一起通过，自动回收取得新日志。GPIO 轮询触控、多指未验收、CPU1 前序偶发预检早退、无硬件 GPU 及长期稳定性均仍有边界。
-
-亮度 64 是 XNU 阶段 DCS 控制的读回值，不是校准百分比，也不表示 UEFI 菜单或系统亮度滑块已适配。旧日期阶段文档中的未完成描述只代表当时状态。
-
-## 2026-10-30 同步说明
-
-最新非GPU结果见 [同步摘要](progress-2026-10-30-non-gpu.md)。c50已自动回收且观察名额已消耗；CPU1窄发布结果与历史苹果标志GUI失败分开保留。本次迁移没有重建FD、触屏或启动手机。整机格式2元数据及验证边界仍以相邻设备仓库的 `docs/repository-format.md` 和 `porting.toml` 为准。
+iPadOS 17 GPU 适配已退役。 [历史 OS 适配记录](https://github.com/kerrinz/UniXNU-zorn/blob/main/docs/archived-os.md)

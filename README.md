@@ -1,73 +1,19 @@
 # uefi-zorn
 
-[【简体中文】](README_CN.md)
+[简体中文](README_CN.md)
 
-Mu-Silicium board package for the Redmi K80 (`zorn`, SM8650-AB, 12 GB + 256 GB), used to temporarily boot UniXNU / DarwinBoot with iPad7,1 / j120ap, iPadOS 17.7.11 (21H461).
+Mu-Silicium board package for the Redmi K80 (`zorn`, SM8650-AB, 12 GB + 256 GB). **iOS 26.6.2 (23G90) is the active UniXNU port.** The iPadOS 17 GPU port is retired and recorded in the device repository. [Historical OS ports](https://github.com/kerrinz/UniXNU-zorn/blob/main/docs/archived-os.md)
 
-This repository owns the K80 firmware board package, BootShim, menu template and image packers. It is not a complete Mu-Silicium checkout. Common, Silicon, ACPI, EDK II and shared UniXNU components retain their upstream sources. [UniXNU-zorn](https://github.com/kerrinz/UniXNU-zorn) owns the kernel, board services and authoritative [porting record](https://github.com/kerrinz/UniXNU-zorn/blob/main/porting.toml).
+This repository owns the firmware board package, BootShim, menu template and image packers. Use an existing Mu-Silicium checkout with its Common, Silicon, ACPI and EDK II inputs. [UniXNU-zorn](https://github.com/kerrinz/UniXNU-zorn) owns the kernel, device drivers, exact iOS 26 build evidence and [porting record](https://github.com/kerrinz/UniXNU-zorn/blob/main/porting.toml).
 
-Official format-2 device documentation is generated from that device repository's root `board.toml` and `porting.toml`; this firmware repository does not publish a duplicate whole-device record. See the [publication guide](https://unixnu.com/zh/porting/records#publishing-and-reuse).
+## Build and handoff
 
-As of2026-11-16,v247 records the GPU-verified IOSurface entering the real display queue with a matching frame/SID,fence,acquire and CPU copy. One protected run returned toTWRP in332.500seconds. It reused the pinned FD and launcher;this update does not claim a new firmware build. Physical known-image output,full GPU desktop,FT3683 gestures and stability remain unqualified;raw diagnostic loss36 keeps strict application incomplete. See [current progress and build scope](docs/progress-2026-11-16-ios26.md).
+Use the staged Mu-Silicium build command and pinned inputs in the [firmware build and handoff guide](docs/build-and-handoff.md). The guide documents the BootShim mailbox and the read-only Block I/O published by `ZornBootMemoryDxe`. iOS 26 device trials bind the exact FD, loader, ADT, menu and root.
 
-As of2026-11-17,the companion v261 trial reached the owner-confirmed iOS desktop and basic gestures,then froze on Settings long press. Both render paths are low frame rate;GPU stability remains unresolved. One protected boot recovered toTWRP333.63s with successful CDC and camera capture. The existing FD/launcher were reused;no new firmware build. Device catalog EOF ingestion repair and exact results are recorded in [current progress](docs/progress-2026-11-17-ios26.md).
+- `Platforms/Xiaomi/zornPkg/` contains the board DSC/FDF, memory map, boot-memory service and touch power handoff.
+- `BootShim/` and `Resources/Configs/zorn.toml` contain the shim and board image parameters.
+- `payload/` contains the menu template and storage descriptor. `scripts/` contains staging and packing tools.
 
-## State
+The device runner operates on `92988a43` / `zorn` / slot A from verified Recovery, with an independent watchdog and explicit Android and Data protection. [Storage and Recovery boundaries](docs/storage-unixnu64.md)
 
-As of 2026-10-30, the combined port has owner-confirmed desktop and basic single-touch interaction, eight-core checks, retained 8 GiB Data, an 8 GiB XNU window and brightness 64. The CPU1 narrow root-publication fix has same-kernel controls and two-layout evidence. A later Apple-logo GUI failure remains unresolved; the final `c50ca7ea` observation showed a lock screen and all-core accounting progress, then recovered automatically. It does not qualify performance, system multi-touch or long-term stability.
-
-The firmware handoff includes the UEFI menu, five-second countdown, DarwinBoot, GOP and the existing touch power handoff. The latest CPU / display observations reused the recorded FD; no new firmware or phone run is implied by this update. Non-GPU results and their limits are synchronized in the [progress snapshot](docs/progress-2026-10-30-non-gpu.md). Ongoing GPU software work is recorded separately below.
-
-## Prerequisites
-
-- Matching sibling `UniXNU/` and `UniXNU-zorn/` checkouts, with their recorded source / component pins.
-- The existing Mu-Silicium source and its required submodules, matching Xcode / SDK / toolchain, and the recorded giulia SM8650 DXE inputs. Proprietary firmware is not redistributed.
-- Matching donor IPSW, trust cache, prepared Data / owner inputs and ABI audit artifacts for full image assembly; see [UniXNU-zorn build instructions](https://github.com/kerrinz/UniXNU-zorn/blob/main/docs/build-and-debug.md).
-
-Read the [UEFI integration guide](https://unixnu.com/zh/porting/uefi-firmware), [device repository guide](https://unixnu.com/zh/porting/device-repository), [AGENTS.md](AGENTS.md) and [firmware handoff instructions](docs/build-and-handoff.md).
-
-## Build entry points
-
-From the common parent, stage this board into an existing Mu-Silicium tree and use the firmware builder:
-
-```sh
-sh uefi-zorn/scripts/stage-into-mu.sh /path/to/Mu-Silicium
-python3 uefi-zorn/scripts/build-zorn-firmware.py --help
-```
-
-The actual build requires the selected legacy diagnostic configuration; follow [build-and-handoff.md](docs/build-and-handoff.md) for its configuration step and complete command. The output is `Build/zornPkg/DEBUG_CLANGPDB/FV/SILICIUM_UEFI.fd` in Mu-Silicium and must be 3 MiB. These examples do not flash or boot a device.
-
-UniXNU-zorn now has a format-2 root configuration and a fixed compatibility board for the existing diagnostic builder. Host configuration / DTS / tree checks are separate from full native-build or device equivalence. Do not use historical runs as verification of a newly migrated output path.
-
-## Firmware and image inputs
-
-- FD base: `0xA7100000`, size `0x300000`.
-- BootShim decompression window: `0xA8000000`–`0xB8000000` (256 MiB); payload mailbox: `0xA7601000`, `ZORNPLD1`.
-- Framebuffer: `0xFC400000`, 1440 × 3200, row bytes 5760, 32 bpp.
-- Payload: 192 MiB FAT32 with 512-byte clusters; Android boot header v4 and gzip, without an Android ramdisk or appended DTB.
-
-The BootShim window, FAT allocation and XNU-owned memory window are separate. Do not enlarge a payload based on nominal RAM capacity. The format-2 host DTS does not replace the currently installed firmware DTB.
-
-## Layout
-
-- `Platforms/Xiaomi/zornPkg/`: DSC / FDF, memory map, boot-memory service and touch power handoff.
-- `BootShim/`, `Resources/Configs/zorn.toml`: board shim and firmware / image parameters.
-- `payload/EFI/UniXNU/unixnu.toml`: menu template.
-- `scripts/`: staging, firmware build, payload packing and boot-image packing.
-- `docs/`: handoff instructions and synchronized device-result summaries.
-
-## Temporary boot and recovery
-
-Use UniXNU-zorn's fixed-target runner with a matching ready / input manifest and independent watchdog. The current dedicated-storage target is `92988a43` / `zorn` / slot `a`; `f85d4270` is a CC9 and must not be operated on. No flash, erase, slot or GPT changes.
-
-After the owner-requested stock reflash and reinstall, iOS occupies a dedicated64GiB `unixnu` partition. Android userdata is preserved and must never receive the raw iOS image. Initial8GiB Data is unixnu-relative16GiB; the single log block is unixnu-relative2291712. OS/SystemOS remain read-only at runtime; BCB tail/full-page checks remain. Use the matching compiled-kernel storage proof when packing. See [current storage layout and verified runs](docs/storage-unixnu64.md). The default `42f3d518` and two desktop-confirmed `3a8ac966` baselines remain preserved. The owner has resumed unattended GPU adaptation after the Git/documentation pause; the original device protections remain in force.
-
-## License
-
-New files use [BSD-2-Clause-Patent](LICENSE); upstream files retain their notices. Apple inputs, vendor binaries and generated firmware / boot images are not committed here.
-
-## GPU scope
-
-GPU-owned memory preparation and its closed diagnostic helpers are published as implemented source. The v247 fixed probe has bounded same-surface queue/acquire/copy and native-close evidence;physical known-image output,complete GPU desktop and long-term behavior remain unqualified. Detailed research summaries are retained in [GPU progress](docs/progress-2026-10-30-gpu.md); many isolated capsules and large logs are local archives, not a runnable production driver. Historical input counts describe their own frozen runs.
-
-The current stock-reflash/unixnu64 installation and owner-confirmed retained Data/touch are documented in [storage-unixnu64](docs/storage-unixnu64.md). Old userdata/slotB images must not be booted on that layout.
+New firmware code uses [BSD-2-Clause-Patent](LICENSE). Vendor binaries and generated images stay in the local workspace.

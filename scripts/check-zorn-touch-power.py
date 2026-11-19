@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Pin native provider ABI and exercise the real handoff header with mocks."""
-import hashlib,json,struct,subprocess,tempfile
+import argparse,hashlib,json,struct,subprocess,tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 HEADER=ROOT/'uefi-zorn/Platforms/Xiaomi/zornPkg/Drivers/ZornBootMemoryDxe/ZornTouchPower.h'
-BLOBS=ROOT.parent/'Mu-Silicium/Binaries/giulia/QcomPkg/Drivers'
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--uefi',type=Path,default=ROOT.parent/'Mu-Silicium')
+parser.add_argument('--out',type=Path,default=ROOT/'out/zorn/touch/power-host-check.json')
+args=parser.parse_args()
+BLOBS=args.uefi.resolve()/'Binaries/giulia/QcomPkg/Drivers'
 PINS={'RpmhDxe':'cdebce5c9f96d16e71a0db8f9c4dbf591ed314dd94a6543b08c238902df65267',
       'CmdDbDxe':'5c58d445f356af9f8497ea6f449ba534fd7920b045067cd3b02ad997863077bf',
       'ClockDxe':'b1608ab9a4759dbbc50e5e5836ee402ff832d8076011e5145460e4af97ba7686'}
@@ -93,4 +97,4 @@ report={'provider_sha256':inputs,'header_sha256':hashlib.sha256(HEADER.read_byte
  'rpmh_method_indices':[1,5,11,18],'cmddb_method_indices':[1,7],'rails':{'ldob14':3200,'ldob12':1800},
  'host_tests':'real header; no marker, bad marker, exact votes, idempotence, every call failure, invalid rail/version/method',
  'hardware_qualified':False}
-out=ROOT/'out/zorn/touch/power-host-check.json';out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))
+out=args.out;out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))

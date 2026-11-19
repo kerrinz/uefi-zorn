@@ -11,6 +11,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--uefi", type=Path, default=ROOT.parent / "Mu-Silicium")
+parser.add_argument("--out", type=Path, help="archive directory for the standard firmware build")
 parser.add_argument("--gpu-platform-prepare", action="store_true", help="build the isolated GPU preparation FD; native GPU invocation stays OFF")
 parser.add_argument("--gpu-checkpoint-prepare", action="store_true", help="build the isolated checkpoint lifecycle join; storage/GPU invocation stays OFF")
 parser.add_argument("--gpu-terminal-collector", action="store_true", help="build the approved offline terminal-record collector FD; storage/GPU invocation stays OFF")
@@ -28,10 +29,15 @@ if args.gpu_platform_prepare or args.gpu_checkpoint_prepare or args.gpu_terminal
         parser.error("Select one isolated firmware stage")
     if args.record_existing:
         parser.error("GPU preparation must build its own outputs")
+    if args.out is not None:
+        parser.error("GPU preparation uses its profile's fixed archive directory")
     from zorn_gpu_firmware import build
     build(ROOT, args.uefi, 'gpu-resource-observation-candidate' if args.gpu_resource_observation_candidate else 'gpu-resource-query-checkpoint-20261101' if args.gpu_resource_query_checkpoint else 'gpu-unixnu64-media-candidate' if args.gpu_unixnu64_media_candidate else 'gpu-unixnu64-closed-firmware' if args.gpu_unixnu64_checkpoint else 'gpu-media-qualification-candidate' if args.gpu_media_qualification_candidate else 'gpu-terminal-commit-integration' if args.gpu_terminal_commit else ('gpu-terminal-collector' if args.gpu_terminal_collector else ('gpu-canonical-checkpoint' if args.gpu_checkpoint_prepare else 'gpu-canonical-firmware')))
     raise SystemExit(0)
-subprocess.run(["python3", str(ROOT / "uefi-zorn/scripts/check-zorn-touch-power.py")], check=True)
+out = (args.out or ROOT / "out/zorn").resolve()
+touch_report = out / "touch/power-host-check.json"
+subprocess.run([sys.executable, str(ROOT / "uefi-zorn/scripts/check-zorn-touch-power.py"),
+                "--uefi", args.uefi, "--out", touch_report], check=True)
 if not args.record_existing:
     sys.path.insert(0, str(ROOT / 'UniXNU-zorn/scripts'))
     from zorn_legacy_device import prepare as prepare_legacy_device
@@ -53,13 +59,11 @@ peoff = int.from_bytes(pe[0x3c:0x40], "little")
 if pe[:2] != b"MZ" or pe[peoff:peoff + 4] != b"PE\0\0" or int.from_bytes(pe[peoff + 4:peoff + 6], "little") != 0xaa64:
     raise SystemExit("Expected an actual AArch64 PE firmware module")
 digest = hashlib.sha256(fd.read_bytes()).hexdigest()
-out = ROOT / "out/zorn"
-out.mkdir(parents=True, exist_ok=True)
 archive = out / ("SILICIUM_UEFI-" + digest[:8] + ".fd")
 shutil.copyfile(fd, archive)
 record = {"fd": str(fd), "sha256": digest, "archive": str(archive),
           "touch_power_supported": True,
-          "touch_power_audit": json.loads((out / "touch/power-host-check.json").read_text()),
+          "touch_power_audit": json.loads(touch_report.read_text()),
           "module_sha256": hashlib.sha256(pe).hexdigest(), "early_watchdog_supported": True,
           "source_sha256": {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources},
           "hardware_tested": False}
